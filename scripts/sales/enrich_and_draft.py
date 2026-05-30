@@ -413,17 +413,26 @@ def render_linkedin_dm(row: dict[str, str]) -> tuple[str, str]:
         row.get("owner_or_pm_name", ""),
         row.get("title", ""),
     )
-    name_prefix = "" if salutation == "there" else f"{salutation} — "
+    # LinkedIn caps connection-request notes at 200 chars. We don't include
+    # the practice name in the note — they know who they are — which keeps
+    # us comfortably under the cap regardless of practice-name length.
+    LIMIT = 200
+    name_prefix = "Hi" if salutation == "there" else salutation
 
     connect_note = (
-        f"{name_prefix}I'm a Yale student building Overturn, software that "
-        f"automates denial appeals for small {spec_phrase}s. Trying to learn "
-        f"how teams like {practice} handle denials today. Open to connecting "
-        f"+ a quick research question?"
+        f"{name_prefix} — Yale student building Overturn (AI denial appeals "
+        f"for small {spec_phrase}s). Doing customer research with practice "
+        f"owners. Open to a quick chat?"
     )
-    if len(connect_note) > 300:
-        # Trim politely
-        connect_note = connect_note[:297].rsplit(" ", 1)[0] + "..."
+    if len(connect_note) > LIMIT:
+        # Fall back to a shorter form if a long specialty phrase pushed us over.
+        connect_note = (
+            f"{name_prefix} — Yale student building Overturn (AI denial "
+            f"appeals for small practices). Doing customer research. "
+            f"Open to a quick chat?"
+        )
+    if len(connect_note) > LIMIT:
+        connect_note = connect_note[: LIMIT - 1].rsplit(" ", 1)[0] + "…"
 
     follow_up = (
         f"Thanks for connecting, {salutation if salutation != 'there' else 'there'}. "
@@ -442,7 +451,7 @@ def write_linkedin_dm(connect_note: str, follow_up: str, slug: str) -> Path:
     LINKEDIN_DIR.mkdir(parents=True, exist_ok=True)
     path = LINKEDIN_DIR / f"{slug}.txt"
     path.write_text(
-        f"=== CONNECT NOTE ({len(connect_note)} chars; LinkedIn limit 300) ===\n\n"
+        f"=== CONNECT NOTE ({len(connect_note)} chars; LinkedIn limit 200) ===\n\n"
         f"{connect_note}\n\n"
         f"=== FOLLOW-UP (send after they accept) ===\n\n"
         f"{follow_up}\n",
