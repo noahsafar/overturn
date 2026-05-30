@@ -1,0 +1,22 @@
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/prompts/package.json ./packages/prompts/
+RUN pnpm install --frozen-lockfile || pnpm install
+
+FROM deps AS build
+COPY . .
+RUN pnpm --filter @overturn/db generate
+RUN pnpm --filter @overturn/web build
+
+FROM node:20-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+COPY --from=build /app .
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@overturn/web", "start"]

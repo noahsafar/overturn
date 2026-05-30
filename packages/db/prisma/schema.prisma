@@ -1,0 +1,185 @@
+// Prisma schema — Phase 1 MVP.
+// Matches the spec in `DEV SPEC.md` § Database Schema.
+// pgvector is enabled via the postgresqlExtensions preview feature.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model Practice {
+  id        String    @id @default(cuid())
+  name      String
+  npi       String    @unique
+  taxId     String
+  specialty String
+  createdAt DateTime  @default(now())
+  patients  Patient[]
+  claims    Claim[]
+  users     User[]
+}
+
+model User {
+  id         String   @id @default(cuid())
+  clerkId    String   @unique
+  email      String
+  practiceId String
+  practice   Practice @relation(fields: [practiceId], references: [id])
+  role       UserRole @default(STAFF)
+  createdAt  DateTime @default(now())
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  practiceId       String
+  practice         Practice @relation(fields: [practiceId], references: [id])
+  externalId       String
+  firstNameEnc     Bytes
+  lastNameEnc      Bytes
+  dobEnc           Bytes
+  memberIdEnc      Bytes
+  insurancePayerId String?
+  payer            Payer?   @relation(fields: [insurancePayerId], references: [id])
+  claims           Claim[]
+  createdAt        DateTime @default(now())
+
+  @@unique([practiceId, externalId])
+}
+
+model Payer {
+  id             String        @id @default(cuid())
+  name           String
+  payerIdNumbers String[]
+  portalUrl      String?
+  ivrPhone       String?
+  faxNumber      String?
+  appealAddress  String?
+  epaSupported   Boolean       @default(false)
+  patients       Patient[]
+  claims         Claim[]
+  policies       PayerPolicy[]
+}
+
+model PayerPolicy {
+  id            String                       @id @default(cuid())
+  payerId       String
+  payer         Payer                        @relation(fields: [payerId], references: [id])
+  policyType    String
+  denialCode    String?
+  effectiveDate DateTime
+  body          String                       @db.Text
+  sourceUrl     String?
+  embedding     Unsupported("vector(1536)")?
+  scrapedAt     DateTime                     @default(now())
+
+  @@index([payerId, denialCode])
+}
+
+model Claim {
+  id           String      @id @default(cuid())
+  practiceId   String
+  practice     Practice    @relation(fields: [practiceId], references: [id])
+  patientId    String
+  patient      Patient     @relation(fields: [patientId], references: [id])
+  payerId      String
+  payer        Payer       @relation(fields: [payerId], references: [id])
+  serviceDate  DateTime
+  cptCodes     String[]
+  icdCodes     String[]
+  billedAmount Decimal     @db.Decimal(10, 2)
+  status       ClaimStatus @default(SUBMITTED)
+  submittedAt  DateTime
+  denials      Denial[]
+  createdAt    DateTime    @default(now())
+
+  @@index([practiceId, status])
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  PAID
+  DENIED
+  APPEALED
+  PARTIALLY_PAID
+  WRITE_OFF
+}
+
+model Denial {
+  id           String   @id @default(cuid())
+  claimId      String
+  claim        Claim    @relation(fields: [claimId], references: [id])
+  denialCode   String
+  denialReason String   @db.Text
+  deniedAmount Decimal  @db.Decimal(10, 2)
+  eraRawText   String   @db.Text
+  receivedAt   DateTime
+  appeals      Appeal[]
+  createdAt    DateTime @default(now())
+
+  @@index([denialCode])
+}
+
+model Appeal {
+  id              String    @id @default(cuid())
+  denialId        String
+  denial          Denial    @relation(fields: [denialId], references: [id])
+  draftLetter     String    @db.Text
+  templateUsed    String
+  citations       Json
+  status          String    @default("PENDING")
+  submittedVia    String?
+  submittedAt     DateTime?
+  outcome         String    @default("PENDING")
+  recoveredAmount Decimal?  @db.Decimal(10, 2)
+  ourFee          Decimal?  @db.Decimal(10, 2)
+  agentRunId      String?
+  agentRun        AgentRun? @relation(fields: [agentRunId], references: [id])
+  humanReviewId   String?
+  humanReview     HumanReview? @relation(fields: [humanReviewId], references: [id])
+  createdAt       DateTime  @default(now())
+
+  @@index([outcome])
+}
+
+model AgentRun {
+  id              String    @id @default(cuid())
+  workflowType    String
+  resourceId      String
+  agentType       String
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  status          String    @default("RUNNING")
+  confidenceScore Float?
+  costCents       Int?
+  errorMessage    String?
+  auditTrail      Json
+  appeals         Appeal[]
+}
+
+model HumanReview {
+  id         String         @id @default(cuid())
+  reviewerId String
+  decision   ReviewDecision
+  reviewedAt DateTime       @default(now())
+  editsMade  String?        @db.Text
+  notes      String?        @db.Text
+  appeals    Appeal[]
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+  EDITED_AND_APPROVED
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="overturn">
+  <rect width="128" height="128" rx="24" fill="#0B1F3A"/>
+  <!-- Same 18:7 outer:inner ratio as the logo "o", scaled to fit the tile. Center (64,64), outer r=40, inner r=15.5 -->
+  <path d="M 92.28 35.72 A 40 40 0 0 1 35.72 92.28 L 53.04 74.96 A 15.5 15.5 0 0 0 74.96 53.04 Z" fill="#FFFFFF"/>
+  <path d="M 92.28 35.72 A 40 40 0 0 0 35.72 92.28 L 53.04 74.96 A 15.5 15.5 0 0 1 74.96 53.04 Z" fill="#10B981"/>
+</svg>

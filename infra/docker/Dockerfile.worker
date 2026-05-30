@@ -1,0 +1,14 @@
+FROM python:3.12-slim-bookworm AS base
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev curl && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir uv
+
+COPY apps/worker/pyproject.toml ./apps/worker/
+COPY packages/prompts ./packages/prompts
+RUN cd apps/worker && uv pip install --system .
+
+COPY apps/worker/src ./apps/worker/src
+ENV PYTHONPATH=/app/apps/worker/src
+EXPOSE 8001
+CMD ["python", "-m", "overturn_worker.dev"]

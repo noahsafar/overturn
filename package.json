@@ -1,0 +1,33 @@
+{
+  "name": "overturn",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI back-office for medical practices — Phase 1 MVP.",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @overturn/db generate",
+    "db:migrate": "pnpm --filter @overturn/db migrate",
+    "db:seed": "pnpm --filter @overturn/db seed",
+    "worker:dev": "cd apps/worker && uv run python -m overturn_worker.dev",
+    "worker:test": "cd apps/worker && uv run pytest",
+    "e2e": "node scripts/run-e2e.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0",
+    "prettier": "^3.3.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

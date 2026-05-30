@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": false,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@overturn/db": ["../../packages/db/src/index.ts"],
+      "@overturn/db/*": ["../../packages/db/src/*"],
+      "@overturn/shared": ["../../packages/shared/src/index.ts"],
+      "@overturn/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80" role="img" aria-label="overturn">
+  <!-- Split mark as the leading "o" — same proportions as the standalone mark and favicon (outer:inner = 18:7) -->
+  <g>
+    <path d="M 34.73 27.77 A 18 18 0 0 1 9.27 53.23 L 17.05 45.45 A 7 7 0 0 0 26.95 35.55 Z" fill="#0B1F3A"/>
+    <path d="M 34.73 27.77 A 18 18 0 0 0 9.27 53.23 L 17.05 45.45 A 7 7 0 0 1 26.95 35.55 Z" fill="#10B981"/>
+  </g>
+  <!-- Rest of wordmark — tightened gap to mark; t pulled toward r so they flow together -->
+  <text x="40" y="58" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="64" letter-spacing="-2.4" fill="#0B1F3A">ver<tspan dx="-3">t</tspan>urn</text>
+</svg>

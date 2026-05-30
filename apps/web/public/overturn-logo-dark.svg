@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80" role="img" aria-label="overturn">
+  <g>
+    <path d="M 34.73 27.27 A 18 18 0 0 1 9.27 52.73 L 17.05 44.95 A 7 7 0 0 0 26.95 35.05 Z" fill="#FFFFFF"/>
+    <path d="M 34.73 27.27 A 18 18 0 0 0 9.27 52.73 L 17.05 44.95 A 7 7 0 0 1 26.95 35.05 Z" fill="#10B981"/>
+  </g>
+  <text x="40" y="58" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="64" letter-spacing="-2.4" fill="#FFFFFF">ver<tspan dx="-7">t</tspan>urn</text>
+</svg>
