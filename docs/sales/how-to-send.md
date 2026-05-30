@@ -7,35 +7,24 @@ malformed mass-blast is your Yale email getting flagged by Google.
 
 ## What got produced
 
-- `outreach/drafts/<slug>.eml` — one per lead with a real email. RFC-822 format.
-  Drag-and-drop into Gmail's compose window to import as a draft.
+- `outreach/drafts/<slug>.txt` — one per lead with a real email. Plain UTF-8.
+  Three header lines (Subject / To / From) above a separator, body below.
 - `outreach/linkedin/<slug>.txt` — one per lead. Has a 300-char connect note
   + a longer follow-up message you send after they accept.
 
 Run `python scripts/sales/enrich_and_draft.py` again any time you update
 `leads.csv` to regenerate.
 
-## Sending the email drafts (5 minutes per draft, ~20 min total)
+## Sending the email drafts (3 minutes per draft, ~10 min total)
 
-The current Gmail UI doesn't let you import .eml files as drafts directly,
-so the workflow is:
-
-1. Open `outreach/drafts/revive-physical-therapy.eml` in your text editor.
+1. Open `outreach/drafts/revive-physical-therapy.txt` in any text editor.
 2. In Gmail (logged into your @yale.edu), click Compose.
-3. Copy the `Subject:` line into Gmail's subject field.
-4. Copy the body (everything after the blank line below the headers) into
-   Gmail's body. The body has quoted-printable encoding for em-dashes —
-   most text editors will display them correctly, but if you see literal
-   `=E2=80=94` strings, replace those with `—`. Or just use plain `--`.
-5. Set the To: field from the `.eml` `To:` header.
-6. **Read it once carefully.** Fix the `[phone]` placeholder. Update the
+3. Copy the `Subject:` line value → Gmail subject field.
+4. Copy the `To:` line value → Gmail to field.
+5. Copy everything below the horizontal separator → Gmail body.
+6. **Read it once carefully.** Fix the `[phone]` placeholder. Update
    `Yale 'XX` to your actual class year. Verify the salutation isn't weird.
 7. Send.
-
-**Alternative: import via Thunderbird.** If you've got a few hours of drafts
-to send, Thunderbird natively imports .eml files as drafts via
-File → Open → Saved Message. You can open all of them at once, edit, and
-forward each through your @yale.edu IMAP.
 
 ## Sending the LinkedIn DMs
 

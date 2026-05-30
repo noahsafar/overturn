@@ -451,16 +451,26 @@ def write_linkedin_dm(connect_note: str, follow_up: str, slug: str) -> Path:
     return path
 
 
-def write_eml(subject: str, body: str, to_addr: str, slug: str) -> Path:
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = "noah.safar@yale.edu"
-    msg["To"] = to_addr
-    msg.set_content(body)
+def write_draft(subject: str, body: str, to_addr: str, slug: str) -> Path:
+    """Write a plain UTF-8 .txt draft. Plain text reads cleanly in any
+    editor — easier to copy-paste into Gmail than the quoted-printable
+    .eml format. Em-dashes etc. render literally."""
     DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = DRAFTS_DIR / f"{slug}.eml"
-    path.write_bytes(bytes(msg))
+    path = DRAFTS_DIR / f"{slug}.txt"
+    content = (
+        f"Subject: {subject}\n"
+        f"To:      {to_addr}\n"
+        f"From:    noah.safar@yale.edu\n"
+        f"{'─' * 72}\n"
+        f"\n"
+        f"{body}\n"
+    )
+    path.write_text(content, encoding="utf-8")
     return path
+
+
+# Kept for back-compat with the existing call site below.
+write_eml = write_draft
 
 
 def main() -> int:
