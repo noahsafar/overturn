@@ -33,6 +33,8 @@ ACTIVITY_REGISTRY = [
     activities.fax_submit_appeal,
     activities.mail_queue_appeal,
     activities.record_submission,
+    activities.schedule_followup_checks,
+    activities.run_followup_check,
 ]
 
 

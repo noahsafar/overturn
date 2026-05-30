@@ -5,7 +5,9 @@ import { requireUser } from "@/lib/auth";
 import { decryptPatient } from "@/lib/patient";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { StartAppealButton } from "./StartAppealButton";
-import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import { ChartExcerptsForm } from "./ChartExcerptsForm";
+import { deadlineState } from "@/lib/deadlines";
+import { ArrowLeftIcon, ArrowRightIcon, ClockIcon } from "@heroicons/react/24/outline";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,8 @@ export default async function DenialDetailPage({
 
   const pt = decryptPatient(denial.claim.patient);
   const latestAppeal = denial.appeals[0];
+  const chartLocked = denial.appeals.some((a) => a.submittedAt !== null);
+  const dl = deadlineState(denial.filingDeadline);
 
   return (
     <div className="space-y-8">
@@ -45,6 +49,48 @@ export default async function DenialDetailPage({
           {pt.firstName} {pt.lastName} · {denial.claim.payer.name} · {denial.denialCode}
         </p>
       </div>
+
+      {dl && (
+        <div
+          className={`card flex items-center gap-3 p-4 ${
+            dl.pastDue
+              ? "border-error-200 bg-error-50"
+              : dl.warn
+                ? "border-warning-200 bg-warning-50"
+                : "border-gray-200"
+          }`}
+        >
+          <ClockIcon
+            className={`h-5 w-5 ${
+              dl.pastDue
+                ? "text-error-700"
+                : dl.warn
+                  ? "text-warning-700"
+                  : "text-gray-500"
+            }`}
+          />
+          <div className="text-sm">
+            {dl.pastDue ? (
+              <span className="font-semibold text-error-700">
+                Filing deadline passed {Math.abs(dl.daysRemaining)} day(s) ago — appeal
+                cannot be submitted to this payer.
+              </span>
+            ) : (
+              <>
+                <span
+                  className={`font-medium ${dl.warn ? "text-warning-800" : "text-gray-800"}`}
+                >
+                  {dl.daysRemaining} day(s) remaining
+                </span>
+                <span className="text-gray-500">
+                  {" "}
+                  to file (deadline {dl.deadline.toLocaleDateString()}).
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card title="Patient">
@@ -71,6 +117,17 @@ export default async function DenialDetailPage({
           </pre>
         </Card>
       </div>
+
+      <section>
+        <h2 className="text-lg font-semibold text-gray-900">Clinical context</h2>
+        <div className="mt-3">
+          <ChartExcerptsForm
+            denialId={denial.id}
+            initialText={denial.chartExcerptsText ?? ""}
+            locked={chartLocked}
+          />
+        </div>
+      </section>
 
       <section>
         <h2 className="text-lg font-semibold text-gray-900">Appeals</h2>

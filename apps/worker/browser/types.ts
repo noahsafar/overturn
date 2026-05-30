@@ -19,6 +19,17 @@ export const SubmitInput = z.object({
     appeal_address: z.string().nullable(),
     epa_supported: z.boolean(),
   }),
+  // Decrypted PayerCredential payload for this (practice, payer). Optional —
+  // the submitter must fail fast with a clear error if missing, rather than
+  // attempt a login it can't complete.
+  credentials: z
+    .object({
+      username: z.string(),
+      password: z.string(),
+      mfa_secret: z.string().nullable(),
+      config: z.record(z.string(), z.unknown()).nullable(),
+    })
+    .nullable(),
 });
 export type SubmitInput = z.infer<typeof SubmitInput>;
 

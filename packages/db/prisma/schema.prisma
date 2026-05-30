@@ -89,6 +89,10 @@ model Patient {
   insurancePayerId String?
   payer            Payer?   @relation(fields: [insurancePayerId], references: [id])
   claims           Claim[]
+  // Right-to-delete: set when a deletion request lands. The row is preserved
+  // for referential integrity but firstNameEnc / lastNameEnc / dobEnc /
+  // memberIdEnc are zeroed.
+  deletedAt        DateTime?
   createdAt        DateTime @default(now())
 
   @@unique([practiceId, externalId])
@@ -103,6 +107,10 @@ model Payer {
   faxNumber        String?
   appealAddress    String?
   epaSupported     Boolean           @default(false)
+  // Days from remittance date allowed for first-level appeal. Default 180
+  // matches BCBS / most plans; some payers (Medicare, certain BCBS regional
+  // plans) are stricter at 120 or 90.
+  appealWindowDays Int               @default(180)
   patients         Patient[]
   claims           Claim[]
   policies         PayerPolicy[]
@@ -185,10 +193,18 @@ model Denial {
   deniedAmount Decimal  @db.Decimal(10, 2)
   eraRawText   String   @db.Text
   receivedAt   DateTime
+  // Clinical context for this denial — pasted by the reviewer from the EHR
+  // or filled by an EHR connector. The LLM cites verbatim from this, so it's
+  // the load-bearing input for any real appeal.
+  chartExcerptsText String? @db.Text
+  // Computed at ingest from receivedAt + payer-configured appeal window
+  // (default 180 days). Used to warn reviewers + block stale submissions.
+  filingDeadline    DateTime?
   appeals      Appeal[]
   createdAt    DateTime @default(now())
 
   @@index([denialCode])
+  @@index([filingDeadline])
 }
 
 model Appeal {

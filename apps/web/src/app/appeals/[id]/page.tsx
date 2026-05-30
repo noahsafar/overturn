@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@overturn/db";
 import { requireUser } from "@/lib/auth";
 import { fmtMoney, fmtDateTime } from "@/lib/format";
+import { deadlineState } from "@/lib/deadlines";
 import { ReviewControls } from "./ReviewControls";
 import { AppealProgressClient } from "./AppealProgressClient";
+import { ClockIcon } from "@heroicons/react/24/outline";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,8 @@ export default async function AppealPage({
     },
   });
   if (!appeal) notFound();
+
+  const dl = deadlineState(appeal.denial.filingDeadline);
 
   const auditEvents = await prisma.auditEvent.findMany({
     where: { practiceId: user.practiceId, resourceType: "appeal", resourceId: id },
@@ -118,7 +122,31 @@ export default async function AppealPage({
             </section>
           )}
 
-          {appeal.outcome === "PENDING" && !appeal.submittedAt && appeal.draftLetter && (
+          {dl && (
+            <section
+              className={`rounded p-3 text-sm flex items-center gap-2 ${
+                dl.pastDue
+                  ? "bg-error-50 text-error-800 border border-error-200"
+                  : dl.warn
+                    ? "bg-warning-50 text-warning-800 border border-warning-200"
+                    : "bg-gray-50 text-gray-700 border border-gray-200"
+              }`}
+            >
+              <ClockIcon className="h-4 w-4" />
+              {dl.pastDue ? (
+                <span>
+                  <strong>Filing deadline passed</strong> {Math.abs(dl.daysRemaining)} day(s)
+                  ago. Submission will be refused.
+                </span>
+              ) : (
+                <span>
+                  {dl.daysRemaining} day(s) until filing deadline ({dl.deadline.toLocaleDateString()}).
+                </span>
+              )}
+            </section>
+          )}
+
+          {appeal.outcome === "PENDING" && !appeal.submittedAt && appeal.draftLetter && !dl?.pastDue && (
             <ReviewControls appealId={appeal.id} initialLetter={appeal.draftLetter} />
           )}
 

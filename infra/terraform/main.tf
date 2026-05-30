@@ -376,6 +376,111 @@ resource "aws_ecs_service" "worker" {
 }
 
 # ────────────────────────────────────────────────────────────────────────────
+# CloudTrail — every AWS API call delivered to the object-locked audit S3
+# ────────────────────────────────────────────────────────────────────────────
+data "aws_caller_identity" "current" {}
+
+resource "aws_s3_bucket_policy" "audit_cloudtrail" {
+  bucket = aws_s3_bucket.audit.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AWSCloudTrailAclCheck"
+        Effect    = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action    = "s3:GetBucketAcl"
+        Resource  = aws_s3_bucket.audit.arn
+      },
+      {
+        Sid       = "AWSCloudTrailWrite"
+        Effect    = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.audit.arn}/cloudtrail/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+        Condition = {
+          StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" }
+        }
+      },
+    ]
+  })
+}
+
+resource "aws_cloudtrail" "main" {
+  name                          = "${local.name}-trail"
+  s3_bucket_name                = aws_s3_bucket.audit.id
+  s3_key_prefix                 = "cloudtrail"
+  include_global_service_events = true
+  is_multi_region_trail         = true
+  enable_log_file_validation    = true
+  depends_on                    = [aws_s3_bucket_policy.audit_cloudtrail]
+
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
+
+    data_resource {
+      type   = "AWS::S3::Object"
+      values = ["${aws_s3_bucket.audit.arn}/", "${aws_s3_bucket.artifacts.arn}/"]
+    }
+  }
+}
+
+# ────────────────────────────────────────────────────────────────────────────
+# WAF — Web ACL for the web app's public surface
+# ────────────────────────────────────────────────────────────────────────────
+# If you host the web app on Vercel, you can either skip WAF or front Vercel
+# with CloudFront and apply this Web ACL. If you host on AWS (ALB/ECS), set
+# scope = "REGIONAL" and associate it with your ALB ARN.
+resource "aws_wafv2_web_acl" "main" {
+  name        = "${local.name}-waf"
+  scope       = "CLOUDFRONT"
+  description = "Overturn web app — rate limit + AWS managed rules"
+
+  default_action { allow {} }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${local.name}-waf"
+    sampled_requests_enabled   = true
+  }
+
+  rule {
+    name     = "rate-limit-2000-per-5min"
+    priority = 1
+    action { block {} }
+    statement {
+      rate_based_statement {
+        limit              = 2000
+        aggregate_key_type = "IP"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "rate-limit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "common-rules"
+    priority = 2
+    override_action { none {} }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "common-rules"
+      sampled_requests_enabled   = true
+    }
+  }
+}
+
+# ────────────────────────────────────────────────────────────────────────────
 # Outputs
 # ────────────────────────────────────────────────────────────────────────────
 output "vpc_id"              { value = module.vpc.vpc_id }
@@ -389,3 +494,5 @@ output "ecr_web_repo"        { value = aws_ecr_repository.web.repository_url }
 output "phi_enc_key_arn"     { value = aws_secretsmanager_secret.phi_enc_key.arn }
 output "anthropic_secret_arn" { value = aws_secretsmanager_secret.anthropic_api_key.arn }
 output "stripe_secret_arn"   { value = aws_secretsmanager_secret.stripe_secret_key.arn }
+output "cloudtrail_arn"      { value = aws_cloudtrail.main.arn }
+output "waf_acl_arn"         { value = aws_wafv2_web_acl.main.arn }

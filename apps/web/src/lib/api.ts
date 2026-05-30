@@ -17,6 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodTypeAny, z } from "zod";
 import { prisma } from "@overturn/db";
 import { isSuperuser, requireUser, type SessionUser } from "./auth";
+import { reportError } from "./observability";
 import { rateLimit } from "./rate-limit";
 
 export type Role = "OWNER" | "ADMIN" | "STAFF";
@@ -216,6 +217,12 @@ export function apiHandler<
         );
       }
       console.error("[api] unhandled error:", err);
+      // Send to Sentry (no-op if DSN unset). Filter PHI before transmit.
+      void reportError(err, {
+        path: new URL(req.url).pathname,
+        practiceId: user.practiceId,
+        userId: user.id,
+      });
       return NextResponse.json(
         { error: "internal_error", message: (err as Error).message },
         { status: 500 },

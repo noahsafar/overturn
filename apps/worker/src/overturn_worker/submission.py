@@ -24,12 +24,33 @@ from pathlib import Path
 import httpx
 
 from .config import SETTINGS
+from .payer_credentials import load_portal_credentials
 
 
 def _audit_dir(appeal_id: str) -> Path:
     p = Path(SETTINGS.artifacts_dir) / "audit-screenshots" / appeal_id
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _resolve_credentials(appeal: dict, payer: dict) -> dict | None:
+    """Pull the (practice, payer) PayerCredential row, decrypt, and return the
+    shape the Stagehand submitter expects. Returns None when not configured."""
+    practice_id = appeal.get("practice_id")
+    if not practice_id:
+        return None
+    try:
+        creds = load_portal_credentials(practice_id, payer["id"])
+    except ValueError:
+        return None
+    if creds is None:
+        return None
+    return {
+        "username": creds.username,
+        "password": creds.password,
+        "mfa_secret": creds.mfa_secret,
+        "config": creds.config,
+    }
 
 
 async def submit_via_portal(appeal: dict, payer: dict) -> dict:
@@ -76,7 +97,8 @@ def _submit_via_stagehand(appeal: dict, payer: dict) -> dict:
     parses its JSON output. The TS side is responsible for screenshot
     capture into the audit-screenshots directory.
     """
-    payload = json.dumps({"appeal": appeal, "payer": payer})
+    credentials = _resolve_credentials(appeal, payer)
+    payload = json.dumps({"appeal": appeal, "payer": payer, "credentials": credentials})
     proc = subprocess.run(
         [
             "pnpm",

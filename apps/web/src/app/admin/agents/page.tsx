@@ -4,11 +4,15 @@ import { fmtDateTime, fmtMoney } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
-  const [recentRuns, agg, byWorkflow] = await Promise.all([
-    prisma.agentRun.findMany({
-      orderBy: { startedAt: "desc" },
-      take: 30,
-    }),
+  const [
+    recentRuns,
+    agg,
+    byWorkflow,
+    appealsTotal,
+    reviewedCount,
+    draftRuns,
+  ] = await Promise.all([
+    prisma.agentRun.findMany({ orderBy: { startedAt: "desc" }, take: 30 }),
     prisma.agentRun.aggregate({
       _count: { _all: true },
       _avg: { confidenceScore: true },
@@ -18,6 +22,17 @@ export default async function AgentsPage() {
       by: ["workflowType", "status"],
       _count: { _all: true },
     }),
+    prisma.appeal.count({ where: { status: "READY" } }),
+    prisma.appeal.count({
+      where: { status: "READY", humanReviewId: { not: null } },
+    }),
+    // Recent draft runs — used to compute redraft (hallucination) rate.
+    prisma.agentRun.findMany({
+      where: { workflowType: "appeal_draft" },
+      orderBy: { startedAt: "desc" },
+      take: 200,
+      select: { auditTrail: true, completedAt: true, startedAt: true },
+    }),
   ]);
 
   const byWf: Record<string, Record<string, number>> = {};
@@ -25,6 +40,26 @@ export default async function AgentsPage() {
     const bucket = byWf[r.workflowType] ?? (byWf[r.workflowType] = {});
     bucket[r.status] = r._count._all;
   }
+
+  const humanReviewRate = appealsTotal > 0 ? reviewedCount / appealsTotal : 0;
+
+  // Hallucination proxy: % of draft runs where the verifier rejected at
+  // least one citation on the first pass (i.e. citation_valid_count is 0
+  // but the run produced a draft). Audit trail stores citation_valid_count.
+  let redraftCount = 0;
+  let avgTimeMs = 0;
+  let timedCount = 0;
+  for (const r of draftRuns) {
+    const audit = (r.auditTrail ?? {}) as Record<string, unknown>;
+    const validCount = Number(audit.citation_valid_count ?? -1);
+    if (validCount === 0) redraftCount += 1;
+    if (r.completedAt && r.startedAt) {
+      avgTimeMs += r.completedAt.getTime() - r.startedAt.getTime();
+      timedCount += 1;
+    }
+  }
+  const redraftRate = draftRuns.length > 0 ? redraftCount / draftRuns.length : 0;
+  const avgTimeSec = timedCount > 0 ? avgTimeMs / timedCount / 1000 : null;
 
   return (
     <div className="space-y-6">
@@ -43,6 +78,24 @@ export default async function AgentsPage() {
           value={agg._avg.confidenceScore !== null ? agg._avg.confidenceScore.toFixed(2) : "—"}
         />
         <Stat label="Total LLM spend" value={fmtMoney((agg._sum.costCents ?? 0) / 100)} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Stat
+          label="Hallucination redraft rate"
+          value={`${(redraftRate * 100).toFixed(1)}%`}
+          sub={`${redraftCount} / ${draftRuns.length} drafts triggered a redraft`}
+        />
+        <Stat
+          label="Human review rate"
+          value={`${(humanReviewRate * 100).toFixed(0)}%`}
+          sub={`${reviewedCount} / ${appealsTotal} READY appeals reviewed`}
+        />
+        <Stat
+          label="Avg draft time"
+          value={avgTimeSec !== null ? `${avgTimeSec.toFixed(1)}s` : "—"}
+          sub="strategize → draft → verify"
+        />
       </div>
 
       <section>
@@ -142,11 +195,12 @@ export default async function AgentsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card p-5">
       <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
       <div className="mt-2 text-3xl font-semibold tabular-nums text-gray-900">{value}</div>
+      {sub && <div className="mt-1 text-xs text-gray-500">{sub}</div>}
     </div>
   );
 }

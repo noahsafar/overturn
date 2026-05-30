@@ -4,6 +4,7 @@
 // records on follow-up payments), see the worker-side ingest service.
 import { prisma, encryptPhi } from "@overturn/db";
 import { apiHandler, badRequest } from "@/lib/api";
+import { computeFilingDeadline } from "@/lib/deadlines";
 import { worker } from "@/lib/worker";
 
 interface EraClaim {
@@ -134,6 +135,7 @@ export const POST = apiHandler(
       });
 
       for (const denial of claimData.denials) {
+        const receivedAt = new Date();
         await prisma.denial.create({
           data: {
             claimId: claim.id,
@@ -141,7 +143,8 @@ export const POST = apiHandler(
             denialReason: denial.reason || `Denial code ${denial.code}`,
             deniedAmount: denial.amount.toString(),
             eraRawText: `CLP*${claimData.control_number}*${claimData.billed}*${claimData.paid}~CAS*${denial.code}*${denial.amount}~`,
-            receivedAt: new Date(),
+            receivedAt,
+            filingDeadline: computeFilingDeadline(receivedAt, payer.appealWindowDays),
           },
         });
         created++;

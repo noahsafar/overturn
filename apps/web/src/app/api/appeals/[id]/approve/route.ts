@@ -18,9 +18,13 @@ export const POST = apiHandler(
   async ({ user, params }) => {
     const a = await prisma.appeal.findFirst({
       where: { id: params.id, denial: { claim: { practiceId: user.practiceId } } },
+      include: { denial: { select: { filingDeadline: true } } },
     });
     if (!a) throw notFound();
     if (a.submittedAt) throw conflict("already submitted");
+    if (a.denial.filingDeadline && a.denial.filingDeadline < new Date()) {
+      throw conflict("filing deadline passed — appeal cannot be submitted");
+    }
 
     const review = await prisma.humanReview.create({
       data: { reviewerId: user.id, decision: "APPROVED" },

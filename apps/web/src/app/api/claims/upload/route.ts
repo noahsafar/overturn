@@ -1,6 +1,7 @@
 // POST /api/claims/upload — CSV ingest of denied claims.
 import { prisma, encryptPhi } from "@overturn/db";
 import { apiHandler, badRequest } from "@/lib/api";
+import { computeFilingDeadline } from "@/lib/deadlines";
 
 interface Row {
   external_patient_id: string;
@@ -105,6 +106,7 @@ export const POST = apiHandler(
         },
       });
 
+      const receivedAt = new Date(r.received_at);
       await prisma.denial.create({
         data: {
           claimId: claim.id,
@@ -112,7 +114,8 @@ export const POST = apiHandler(
           denialReason: r.denial_reason,
           deniedAmount: r.denied_amount,
           eraRawText: r.era_raw,
-          receivedAt: new Date(r.received_at),
+          receivedAt,
+          filingDeadline: computeFilingDeadline(receivedAt, payer.appealWindowDays),
         },
       });
 

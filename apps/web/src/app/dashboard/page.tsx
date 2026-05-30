@@ -6,41 +6,77 @@ import {
   InboxStackIcon,
   PaperAirplaneIcon,
   TrophyIcon,
+  ClockIcon,
+  CheckBadgeIcon,
 } from "@heroicons/react/24/outline";
 
 export const dynamic = "force-dynamic";
 
 async function loadMetrics(practiceId: string) {
-  const [pendingDenials, appeals, recovered] = await Promise.all([
-    prisma.denial.count({
-      where: { claim: { practiceId }, appeals: { none: {} } },
-    }),
-    prisma.appeal.groupBy({
-      by: ["outcome"],
-      where: { denial: { claim: { practiceId } } },
-      _count: { _all: true },
-    }),
-    prisma.appeal.aggregate({
-      where: {
-        denial: { claim: { practiceId } },
-        outcome: { in: ["WON", "PARTIAL"] },
-      },
-      _sum: { recoveredAmount: true, ourFee: true },
-    }),
-  ]);
+  const [pendingDenials, totalDenials, appeals, recovered, recoveredAppeals] =
+    await Promise.all([
+      prisma.denial.count({
+        where: { claim: { practiceId }, appeals: { none: {} } },
+      }),
+      prisma.denial.count({ where: { claim: { practiceId } } }),
+      prisma.appeal.groupBy({
+        by: ["outcome"],
+        where: { denial: { claim: { practiceId } } },
+        _count: { _all: true },
+      }),
+      prisma.appeal.aggregate({
+        where: {
+          denial: { claim: { practiceId } },
+          outcome: { in: ["WON", "PARTIAL"] },
+        },
+        _sum: { recoveredAmount: true, ourFee: true },
+      }),
+      // For days-to-recovery we need (submittedAt, outcomeRecordedAt) pairs
+      prisma.appeal.findMany({
+        where: {
+          denial: { claim: { practiceId } },
+          outcome: { in: ["WON", "PARTIAL"] },
+          submittedAt: { not: null },
+          outcomeRecordedAt: { not: null },
+        },
+        select: { submittedAt: true, outcomeRecordedAt: true },
+      }),
+    ]);
 
   const byOutcome = Object.fromEntries(appeals.map((a) => [a.outcome, a._count._all]));
   const totalAppeals = appeals.reduce((s, a) => s + a._count._all, 0);
   const wonCount = (byOutcome.WON ?? 0) + (byOutcome.PARTIAL ?? 0);
-  const settled = totalAppeals - (byOutcome.PENDING ?? 0);
+  const settled =
+    totalAppeals - (byOutcome.PENDING ?? 0) - (byOutcome.SUBMITTED ?? 0);
   const winRate = settled > 0 ? wonCount / settled : 0;
+
+  // Avg days from submission to recovery confirmation
+  let avgDaysToRecovery: number | null = null;
+  if (recoveredAppeals.length > 0) {
+    const totalMs = recoveredAppeals.reduce((sum, a) => {
+      if (!a.submittedAt || !a.outcomeRecordedAt) return sum;
+      return sum + (a.outcomeRecordedAt.getTime() - a.submittedAt.getTime());
+    }, 0);
+    avgDaysToRecovery = totalMs / recoveredAppeals.length / 86_400_000;
+  }
+
+  // % of denials with an appeal (worked at all)
+  const workedDenials = totalDenials - pendingDenials;
+  const pctWorked = totalDenials > 0 ? workedDenials / totalDenials : 0;
 
   return {
     pendingDenials,
+    totalDenials,
     totalAppeals,
     winRate,
+    pctWorked,
+    avgDaysToRecovery,
     recovered: Number(recovered._sum.recoveredAmount ?? 0),
     ourFee: Number(recovered._sum.ourFee ?? 0),
+    inFlight: (byOutcome.PENDING ?? 0) + (byOutcome.SUBMITTED ?? 0),
+    won: wonCount,
+    lost: byOutcome.LOST ?? 0,
+    skipped: byOutcome.SKIPPED ?? 0,
   };
 }
 
@@ -58,21 +94,56 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Recovered" value={fmtMoney(m.recovered)} icon={BanknotesIcon} tone="hero" />
-        <Stat label="Pending denials" value={String(m.pendingDenials)} icon={InboxStackIcon} />
-        <Stat label="Appeals submitted" value={String(m.totalAppeals)} icon={PaperAirplaneIcon} />
-        <Stat label="Win rate" value={`${(m.winRate * 100).toFixed(0)}%`} icon={TrophyIcon} />
+        <Stat
+          label="Recovered"
+          value={fmtMoney(m.recovered)}
+          sub={`${m.won} won, ${m.lost} lost`}
+          icon={BanknotesIcon}
+          tone="hero"
+        />
+        <Stat
+          label="Pending denials"
+          value={String(m.pendingDenials)}
+          sub={`of ${m.totalDenials} total`}
+          icon={InboxStackIcon}
+        />
+        <Stat
+          label="In flight"
+          value={String(m.inFlight)}
+          sub="submitted, awaiting outcome"
+          icon={PaperAirplaneIcon}
+        />
+        <Stat
+          label="Win rate"
+          value={`${(m.winRate * 100).toFixed(0)}%`}
+          sub={`of settled appeals`}
+          icon={TrophyIcon}
+        />
       </div>
 
-      <div className="card p-5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-gray-700">Your fee</h2>
-          <span className="text-xs text-gray-400">25% of recovered</span>
-        </div>
-        <div className="mt-2 text-2xl font-semibold text-gray-900">{fmtMoney(m.ourFee)}</div>
-        <p className="mt-1 text-xs text-gray-500">
-          You only pay when we recover. Fees are calculated on settled appeals.
-        </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Stat
+          label="% denials worked"
+          value={`${(m.pctWorked * 100).toFixed(0)}%`}
+          sub="vs. left unworked"
+          icon={CheckBadgeIcon}
+        />
+        <Stat
+          label="Avg days to recovery"
+          value={
+            m.avgDaysToRecovery !== null
+              ? `${m.avgDaysToRecovery.toFixed(0)}d`
+              : "—"
+          }
+          sub="submission → payment"
+          icon={ClockIcon}
+        />
+        <Stat
+          label="Your fee"
+          value={fmtMoney(m.ourFee)}
+          sub="25% of recovered"
+          icon={BanknotesIcon}
+        />
       </div>
     </div>
   );
@@ -83,11 +154,13 @@ type IconType = React.ComponentType<{ className?: string }>;
 function Stat({
   label,
   value,
+  sub,
   icon: Icon,
   tone = "default",
 }: {
   label: string;
   value: string;
+  sub?: string;
   icon: IconType;
   tone?: "default" | "hero";
 }) {
@@ -99,6 +172,7 @@ function Stat({
           <Icon className="h-5 w-5 text-gray-300" />
         </div>
         <div className="mt-3 text-3xl font-semibold">{value}</div>
+        {sub && <div className="mt-1 text-xs text-gray-300">{sub}</div>}
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
       </div>
     );
@@ -110,6 +184,7 @@ function Stat({
         <Icon className="h-5 w-5 text-gray-400" />
       </div>
       <div className="mt-3 text-3xl font-semibold text-gray-900">{value}</div>
+      {sub && <div className="mt-1 text-xs text-gray-500">{sub}</div>}
     </div>
   );
 }

@@ -50,6 +50,10 @@ class IngestOutcomesReq(BaseModel):
     era: str
 
 
+class BackfillEmbeddingsReq(BaseModel):
+    payerId: str | None = None
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"ok": True}
@@ -165,4 +169,20 @@ async def ingest_outcomes(req: IngestOutcomesReq) -> dict:
         }
     except Exception as e:
         logger.exception(f"outcome ingest failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
+@app.post("/internal/backfill-embeddings")
+async def backfill_embeddings_endpoint(req: BackfillEmbeddingsReq) -> dict:
+    """Compute + persist embeddings for any PayerPolicy that doesn't have one.
+
+    Called from the web after a bulk policy import. Pass payerId to scope.
+    """
+    try:
+        from .retrieval import backfill_embeddings
+
+        updated = backfill_embeddings(req.payerId)
+        return {"updated": updated}
+    except Exception as e:
+        logger.exception(f"embedding backfill failed: {e}")
         raise HTTPException(500, str(e)) from e

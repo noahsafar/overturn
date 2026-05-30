@@ -166,17 +166,58 @@ class AppealSubmitWorkflow:
             args=[appeal_id, result],
             start_to_close_timeout=timedelta(seconds=20),
         )
+
+        # Kick off the follow-up cadence as a child workflow. We don't
+        # await it — submission returns immediately; follow-up checks run
+        # asynchronously across the next ~60 days.
+        confirmation = result.get("confirmation_number", "")
+        await workflow.start_child_workflow(
+            FollowUpCheckWorkflow.run,
+            args=[appeal_id, confirmation],
+            id=f"followup-{appeal_id}",
+            task_queue=workflow.info().task_queue,
+            parent_close_policy=workflow.ParentClosePolicy.ABANDON,
+        )
         return result
 
 
 @workflow.defn
 class FollowUpCheckWorkflow:
-    """Check on a submitted appeal 14 days later. Phase 1 stub — Phase 2
-    fills in the voice-IVR / portal-status check activities."""
+    """Tracks an appeal's outcome after submission.
+
+    Schedule: 14, 30, 60 days from submission. At each tick:
+      - If outcome is already terminal (WON/PARTIAL/LOST/REJECTED), exit early.
+      - Otherwise, mark a FollowUpCheck row COMPLETED if it falls due, or
+        escalate (notify ops) if no outcome has landed by the 30/60 day mark.
+
+    Phase 2 will add real portal status-check + voice-IVR follow-up
+    activities to this workflow; right now the check is "did an ERA arrive
+    that flipped this appeal's outcome." That's enough to close the loop on
+    fax + portal submissions where the payer pays via a follow-up 835.
+    """
+
+    SCHEDULE_DAYS = (14, 30, 60)
 
     @workflow.run
-    async def run(self, appeal_id: str, confirmation: str) -> None:
-        await workflow.sleep(timedelta(days=14))
-        # Phase 1 deliberately leaves the actual follow-up unimplemented;
-        # the dev spec marks voice as out of scope.
-        return None
+    async def run(self, appeal_id: str, confirmation: str) -> dict:
+        # Seed the schedule rows up-front so they show in /admin/ops as
+        # planned work, not invisible promises.
+        scheduled = await workflow.execute_activity(
+            activities.schedule_followup_checks,
+            args=[appeal_id, list(self.SCHEDULE_DAYS)],
+            start_to_close_timeout=timedelta(seconds=20),
+        )
+
+        last_result: dict = {"appeal_id": appeal_id, "checks_run": 0, "escalated": False}
+        for check_id, days in zip(scheduled, self.SCHEDULE_DAYS):
+            await workflow.sleep(timedelta(days=days))
+            result = await workflow.execute_activity(
+                activities.run_followup_check,
+                args=[appeal_id, check_id, days],
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            last_result = {**result, "appeal_id": appeal_id}
+            # Terminal outcome → no further checks needed.
+            if result.get("outcome_terminal"):
+                return last_result
+        return last_result

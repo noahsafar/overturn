@@ -64,7 +64,7 @@ def fixtures(session_factory):
         s.add(Payer(
             id=payer_id, name="Test Payer", payerIdNumbers=["TEST001"],
             portalUrl=None, ivrPhone=None, faxNumber=None, appealAddress=None,
-            epaSupported=False,
+            epaSupported=False, appealWindowDays=180,
         ))
         s.flush()
         s.add(Patient(

@@ -20,7 +20,8 @@ stubs. Production requires the items below. None can be done by code alone.
 Move every env var marked secret in `.env.example` into AWS Secrets Manager
 with rotation policies:
 
-- `PHI_ENC_KEY` — quarterly rotation, re-encrypt job in `scripts/`
+- `PHI_ENC_KEY` — quarterly rotation, re-encrypt job at
+  `packages/db/scripts/rotate-phi-key.mjs` (run with `--dry-run` first)
 - `ANTHROPIC_API_KEY`
 - `CLERK_SECRET_KEY`
 - `BROWSERBASE_API_KEY`

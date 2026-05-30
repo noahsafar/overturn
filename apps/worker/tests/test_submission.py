@@ -53,6 +53,7 @@ def appeal_fixture():
             id=payer_id, name="Test Payer", payerIdNumbers=["T"],
             portalUrl=None, ivrPhone=None, faxNumber="+18005550199",
             appealAddress="PO Box 1234, Somewhere ST 00000", epaSupported=False,
+            appealWindowDays=180,
         ))
         s.flush()
         s.add(Patient(

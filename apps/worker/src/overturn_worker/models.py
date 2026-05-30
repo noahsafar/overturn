@@ -125,6 +125,7 @@ class Payer(Base):
     faxNumber: Mapped[str | None] = mapped_column(String, nullable=True)
     appealAddress: Mapped[str | None] = mapped_column(String, nullable=True)
     epaSupported: Mapped[bool] = mapped_column(Boolean)
+    appealWindowDays: Mapped[int] = mapped_column(Integer)
 
 
 class PayerPolicy(Base):
@@ -165,6 +166,7 @@ class Patient(Base):
     insurancePayerId: Mapped[str | None] = mapped_column(
         String, ForeignKey("Payer.id"), nullable=True
     )
+    deletedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Claim(Base):
@@ -194,6 +196,8 @@ class Denial(Base):
     deniedAmount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     eraRawText: Mapped[str] = mapped_column(Text)
     receivedAt: Mapped[datetime] = mapped_column(DateTime)
+    chartExcerptsText: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filingDeadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     claim: Mapped[Claim] = relationship(Claim, lazy="joined", foreign_keys=[claimId])
 
 

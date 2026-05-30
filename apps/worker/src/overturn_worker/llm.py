@@ -53,15 +53,32 @@ def call_claude_json(
     max_tokens: int = 2048,
     stub_response: dict[str, Any] | None = None,
 ) -> LLMResult:
-    """Call Claude and return parsed JSON.
+    """Call Claude and return parsed JSON. Traced via Langfuse if configured."""
+    from .langfuse_client import trace_llm_call
 
-    If no API key is configured and a `stub_response` is provided, that
-    canned response is returned. This is how the e2e pipeline runs without
-    a real API key.
+    return trace_llm_call(
+        name="claude_json",
+        model=model or SETTINGS.anthropic_model_draft,
+        prompt=user,
+        fn=lambda: _call_claude_json_impl(
+            system=system,
+            user=user,
+            model=model,
+            max_tokens=max_tokens,
+            stub_response=stub_response,
+        ),
+    )
 
-    Uses Z.ai proxy (https://api.z.ai/api/anthropic/v1/messages) when available,
-    otherwise uses direct Anthropic API.
-    """
+
+def _call_claude_json_impl(
+    *,
+    system: str,
+    user: str,
+    model: str | None,
+    max_tokens: int,
+    stub_response: dict[str, Any] | None,
+) -> LLMResult:
+    """Inner implementation — kept separate so the Langfuse wrapper can trace it."""
 
     chosen_model = model or SETTINGS.anthropic_model_draft
 

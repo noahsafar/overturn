@@ -62,6 +62,7 @@ def loop_fixture():
             id=payer_id, name="E2E Payer", payerIdNumbers=["E2E"],
             portalUrl=None, ivrPhone=None, faxNumber="+18005550199",
             appealAddress="PO Box 1, Test ST 00000", epaSupported=False,
+            appealWindowDays=180,
         ))
         s.flush()
         s.add(PayerPolicy(

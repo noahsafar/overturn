@@ -53,7 +53,7 @@ def appeal_for_ingest(tmp_path, monkeypatch):
         s.add(Payer(
             id=payer_id, name="Test Payer", payerIdNumbers=["T"],
             portalUrl=None, ivrPhone=None, faxNumber=None, appealAddress=None,
-            epaSupported=False,
+            epaSupported=False, appealWindowDays=180,
         ))
         s.flush()
         s.add(Patient(

@@ -25,7 +25,8 @@ from .documo import send_fax
 from .llm import call_claude_json
 from .lob import send_letter
 from .models import (
-    AgentRun, Appeal, Claim, Denial, Payer, PayerPolicy, SessionLocal, Submission,
+    AgentRun, Appeal, Claim, Denial, FollowUpCheck, Payer, PayerPolicy,
+    SessionLocal, Submission,
 )
 from .pdf import AppealLetterPdfInput, render_appeal_letter_pdf
 from .prompts import DRAFT_V1, REDRAFT_V1, STRATEGIZE_V1, render
@@ -95,24 +96,34 @@ class VerifyResult:
     invalid_explained: str  # human-readable for the redraft prompt
 
 
-# Per-PHI policy — chart excerpts in dev/test are pulled from a denial's
-# notes column if present, otherwise synthesized from claim metadata. In
-# production this hits the EHR/PM connector.
-def _synthesize_chart_excerpts(claim: Claim, denial: Denial) -> list[str]:
+# Chart excerpts source order:
+#   1. Real text the reviewer pasted into Denial.chartExcerptsText (or that
+#      an EHR connector pulled in). Each blank line separates one excerpt.
+#   2. A deliberately threadbare placeholder when nothing is set. We do NOT
+#      fabricate plausible-looking clinical content here — the LLM must see
+#      that there are no real notes and flag the denial as "insufficient
+#      documentation" rather than hallucinate a defense.
+def _real_chart_excerpts(denial: Denial) -> list[str] | None:
+    raw = (denial.chartExcerptsText or "").strip()
+    if not raw:
+        return None
+    chunks = [c.strip() for c in raw.split("\n\n") if c.strip()]
+    return chunks or [raw]
+
+
+def _placeholder_chart_excerpts(claim: Claim, denial: Denial) -> list[str]:
     return [
         (
-            f"Encounter note {claim.serviceDate:%Y-%m-%d}: patient presents with "
-            f"diagnosis ICD-10 {','.join(claim.icdCodes)}. Service rendered CPT "
-            f"{','.join(claim.cptCodes)}. Clinician documented symptom severity, "
-            "treatment plan goals, and member's response to prior session per "
-            "Section 4.2 documentation standards."
-        ),
-        (
-            f"Treatment plan dated {claim.serviceDate:%Y-%m-%d}: measurable goals "
-            "for reduction in PHQ-9 score, with re-evaluation scheduled within "
-            "90 days. Member has documented DSM-5 diagnosis matching ICD-10 codes."
+            f"(no chart excerpts on file — service {claim.serviceDate:%Y-%m-%d}, "
+            f"CPT {','.join(claim.cptCodes) or '?'}, "
+            f"ICD {','.join(claim.icdCodes) or '?'}, "
+            f"denial {denial.denialCode})"
         ),
     ]
+
+
+def _chart_excerpts_for(claim: Claim, denial: Denial) -> list[str]:
+    return _real_chart_excerpts(denial) or _placeholder_chart_excerpts(claim, denial)
 
 
 # ── Activity: load denial context ───────────────────────────────────────────
@@ -135,7 +146,7 @@ async def load_denial_context(denial_id: str) -> dict:
             service_date=claim.serviceDate.strftime("%Y-%m-%d"),
             cpt_codes=list(claim.cptCodes),
             icd_codes=list(claim.icdCodes),
-            chart_excerpts=_synthesize_chart_excerpts(claim, denial),
+            chart_excerpts=_chart_excerpts_for(claim, denial),
             patient_first_name=decrypt(patient.firstNameEnc),
             patient_last_name=decrypt(patient.lastNameEnc),
             patient_member_id=decrypt(patient.memberIdEnc),
@@ -515,6 +526,7 @@ async def load_appeal(appeal_id: str) -> dict:
             "denial_id": a.denialId,
             "claim_id": claim.id,
             "payer_id": claim.payerId,
+            "practice_id": claim.practiceId,
             "letter": a.draftLetter,
             "primary_reason": (a.citations[0]["policyId"] if a.citations else "appeal"),
             "denied_amount": float(a.denial.deniedAmount),
@@ -760,3 +772,82 @@ Please revise the letter according to the user's request. Respond with the revis
         max_tokens=4000,
     )
     return res.text
+
+
+# ── Follow-up check activities ─────────────────────────────────────────────
+@activity.defn
+async def schedule_followup_checks(appeal_id: str, days: list[int]) -> list[str]:
+    """Create FollowUpCheck rows for the given offsets so they appear in the
+    ops triage queue as planned work. Returns the ids in input order."""
+    now = datetime.utcnow()
+    ids: list[str] = []
+    with SessionLocal() as s:
+        # Need the practiceId via Appeal → Denial → Claim. Lazy-load picks it up.
+        appeal = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
+        if appeal is None:
+            raise ValueError(f"appeal {appeal_id} not found")
+        practice_id = appeal.denial.claim.practiceId
+        for d in days:
+            check_id = "cm" + uuid.uuid4().hex[:22]
+            ids.append(check_id)
+            s.add(
+                FollowUpCheck(
+                    id=check_id,
+                    appealId=appeal_id,
+                    practiceId=practice_id,
+                    scheduledFor=now + timedelta(days=d),
+                    status="PENDING",
+                    outcome=None,
+                    notes=None,
+                    createdAt=now,
+                    completedAt=None,
+                )
+            )
+        s.commit()
+    return ids
+
+
+@activity.defn
+async def run_followup_check(appeal_id: str, check_id: str, days: int) -> dict:
+    """Mark a FollowUpCheck COMPLETED + record what we found.
+
+    Phase 1: the only signal we have is whether an inbound ERA flipped the
+    appeal's outcome to terminal. If yes, we're done. If no, the check is
+    completed with status "still pending"; the 30/60-day ticks will escalate
+    via a notify call when no outcome has landed by then.
+    """
+    now = datetime.utcnow()
+    with SessionLocal() as s:
+        check = s.scalar(select(FollowUpCheck).where(FollowUpCheck.id == check_id))
+        appeal = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
+        if check is None or appeal is None:
+            return {"checks_run": 0, "escalated": False, "outcome_terminal": False}
+
+        terminal = appeal.outcome in ("WON", "PARTIAL", "LOST", "REJECTED_BY_HUMAN")
+        check.status = "COMPLETED"
+        check.completedAt = now
+        check.outcome = appeal.outcome
+        if terminal:
+            check.notes = f"Outcome already {appeal.outcome} at {days}-day check."
+        else:
+            check.notes = (
+                f"{days}-day check: no payer response yet (status={appeal.outcome})."
+            )
+        s.commit()
+
+    escalated = False
+    # On the 30- and 60-day ticks, notify ops if outcome is still pending.
+    if not terminal and days >= 30:
+        try:
+            from .web_client import notify_appeal_outcome
+            notify_appeal_outcome(appeal_id)
+            escalated = True
+        except Exception as e:  # noqa: BLE001
+            logger.warning("escalation notify failed: %s", e)
+
+    return {
+        "checks_run": 1,
+        "escalated": escalated,
+        "outcome_terminal": terminal,
+        "days": days,
+    }
