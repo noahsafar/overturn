@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@overturn/db";
 import { requireUser } from "@/lib/auth";
 
@@ -33,7 +34,11 @@ export default async function PayersSettingsPage() {
           <tbody className="divide-y divide-gray-100">
             {payers.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50/70">
-                <td className="px-5 py-3 font-medium text-gray-900">{p.name}</td>
+                <td className="px-5 py-3 font-medium text-gray-900">
+                  <Link href={`/settings/payers/${p.id}`} className="hover:underline">
+                    {p.name}
+                  </Link>
+                </td>
                 <td className="max-w-[24ch] truncate px-5 py-3 text-gray-600">
                   {p.portalUrl ?? "—"}
                 </td>

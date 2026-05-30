@@ -1,42 +1,46 @@
 // POST /api/appeals/:id/edit — save reviewer-edited letter, then submit.
-import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@overturn/db";
-import { requireUser } from "@/lib/auth";
+import { apiHandler, conflict, notFound } from "@/lib/api";
 import { worker } from "@/lib/worker";
 
-const Body = z.object({ letter: z.string().min(50) });
+const ParamsSchema = z.object({ id: z.string().min(1) });
+const BodySchema = z.object({ letter: z.string().min(50).max(50_000) });
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  let user;
-  try { user = await requireUser(); } catch { return new NextResponse("unauthenticated", { status: 401 }); }
+export const POST = apiHandler(
+  {
+    paramsSchema: ParamsSchema,
+    bodySchema: BodySchema,
+    audit: ({ params }) => ({
+      action: "appeal.edit_and_approve",
+      resourceType: "appeal",
+      resourceId: params.id,
+    }),
+  },
+  async ({ user, params, body }) => {
+    const a = await prisma.appeal.findFirst({
+      where: { id: params.id, denial: { claim: { practiceId: user.practiceId } } },
+    });
+    if (!a) throw notFound();
+    if (a.submittedAt) throw conflict("already submitted");
 
-  const parsed = Body.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return new NextResponse("bad body", { status: 400 });
+    const review = await prisma.humanReview.create({
+      data: {
+        reviewerId: user.id,
+        decision: "EDITED_AND_APPROVED",
+        editsMade: body.letter,
+      },
+    });
+    await prisma.appeal.update({
+      where: { id: params.id },
+      data: { draftLetter: body.letter, humanReviewId: review.id },
+    });
 
-  const a = await prisma.appeal.findFirst({
-    where: { id, denial: { claim: { practiceId: user.practiceId } } },
-  });
-  if (!a) return new NextResponse("not found", { status: 404 });
-  if (a.submittedAt) return new NextResponse("already submitted", { status: 409 });
-
-  const review = await prisma.humanReview.create({
-    data: {
-      reviewerId: user.id,
-      decision: "EDITED_AND_APPROVED",
-      editsMade: parsed.data.letter,
-    },
-  });
-  await prisma.appeal.update({
-    where: { id },
-    data: { draftLetter: parsed.data.letter, humanReviewId: review.id },
-  });
-
-  try { await worker.submit(id); }
-  catch (e) { return new NextResponse(`worker unavailable: ${(e as Error).message}`, { status: 502 }); }
-  return NextResponse.json({ ok: true });
-}
+    try {
+      await worker.submit(params.id);
+    } catch (e) {
+      return new Response(`worker unavailable: ${(e as Error).message}`, { status: 502 });
+    }
+    return { ok: true };
+  },
+);

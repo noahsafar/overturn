@@ -1,31 +1,35 @@
 // GET /api/appeals/:id — JSON detail.
-import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@overturn/db";
-import { requireUser } from "@/lib/auth";
+import { apiHandler, notFound } from "@/lib/api";
 
-export async function GET(
-  _: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  let user;
-  try { user = await requireUser(); } catch { return new NextResponse("unauthenticated", { status: 401 }); }
+const ParamsSchema = z.object({ id: z.string().min(1) });
 
-  const a = await prisma.appeal.findFirst({
-    where: { id, denial: { claim: { practiceId: user.practiceId } } },
-    include: { agentRun: true, humanReview: true },
-  });
-  if (!a) return new NextResponse("not found", { status: 404 });
-
-  return NextResponse.json({
-    id: a.id,
-    outcome: a.outcome,
-    submittedAt: a.submittedAt,
-    submittedVia: a.submittedVia,
-    draftLetter: a.draftLetter,
-    citations: a.citations,
-    templateUsed: a.templateUsed,
-    agentRun: a.agentRun,
-    humanReview: a.humanReview,
-  });
-}
+export const GET = apiHandler(
+  {
+    paramsSchema: ParamsSchema,
+    audit: ({ params }) => ({
+      action: "appeal.view",
+      resourceType: "appeal",
+      resourceId: params.id,
+    }),
+  },
+  async ({ user, params }) => {
+    const a = await prisma.appeal.findFirst({
+      where: { id: params.id, denial: { claim: { practiceId: user.practiceId } } },
+      include: { agentRun: true, humanReview: true },
+    });
+    if (!a) throw notFound();
+    return {
+      id: a.id,
+      outcome: a.outcome,
+      submittedAt: a.submittedAt,
+      submittedVia: a.submittedVia,
+      draftLetter: a.draftLetter,
+      citations: a.citations,
+      templateUsed: a.templateUsed,
+      agentRun: a.agentRun,
+      humanReview: a.humanReview,
+    };
+  },
+);

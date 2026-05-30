@@ -1,13 +1,6 @@
-// POST /api/claims/upload
-//
-// Accepts a CSV body (header row required) and creates Patient / Claim /
-// Denial rows for the authenticated practice. This is the manual-CSV path
-// per the spec's Week-3 milestone; the production path consumes 835 EDI
-// remittances via clearinghouse webhooks.
-
-import { NextResponse, type NextRequest } from "next/server";
+// POST /api/claims/upload — CSV ingest of denied claims.
 import { prisma, encryptPhi } from "@overturn/db";
-import { requireUser } from "@/lib/auth";
+import { apiHandler, badRequest } from "@/lib/api";
 
 interface Row {
   external_patient_id: string;
@@ -41,20 +34,22 @@ function parseCsv(body: string): Row[] {
 }
 
 function splitCsvLine(line: string): string[] {
-  // Minimal CSV split that handles double-quoted fields. Adequate for our
-  // simple ingest path; production replaces this with a real 835 parser.
   const out: string[] = [];
   let cur = "";
   let inQ = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i]!;
     if (inQ) {
-      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-      else if (c === '"') inQ = false;
+      if (c === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (c === '"') inQ = false;
       else cur += c;
     } else {
-      if (c === ",") { out.push(cur); cur = ""; }
-      else if (c === '"') inQ = true;
+      if (c === ",") {
+        out.push(cur);
+        cur = "";
+      } else if (c === '"') inQ = true;
       else cur += c;
     }
   }
@@ -62,67 +57,68 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-export async function POST(req: NextRequest) {
-  let user;
-  try { user = await requireUser(); } catch { return new NextResponse("unauthenticated", { status: 401 }); }
+export const POST = apiHandler(
+  {
+    requiredRole: "STAFF",
+    audit: { action: "claims.upload_csv", resourceType: "claim" },
+  },
+  async ({ user, req }) => {
+    const body = await req.text();
+    const rows = parseCsv(body);
+    if (rows.length === 0) throw badRequest("no rows parsed");
 
-  const body = await req.text();
-  const rows = parseCsv(body);
-  if (rows.length === 0) return new NextResponse("no rows parsed", { status: 400 });
+    let created = 0;
+    for (const r of rows) {
+      const payer = await prisma.payer.findUnique({ where: { id: r.payer_id } });
+      if (!payer) throw badRequest(`unknown payer_id: ${r.payer_id}`);
 
-  let created = 0;
-  for (const r of rows) {
-    const payer = await prisma.payer.findUnique({ where: { id: r.payer_id } });
-    if (!payer) {
-      return new NextResponse(`unknown payer_id: ${r.payer_id}`, { status: 400 });
-    }
-
-    const patient = await prisma.patient.upsert({
-      where: {
-        practiceId_externalId: {
+      const patient = await prisma.patient.upsert({
+        where: {
+          practiceId_externalId: {
+            practiceId: user.practiceId,
+            externalId: r.external_patient_id,
+          },
+        },
+        update: { insurancePayerId: payer.id },
+        create: {
           practiceId: user.practiceId,
           externalId: r.external_patient_id,
+          firstNameEnc: encryptPhi(r.first_name),
+          lastNameEnc: encryptPhi(r.last_name),
+          dobEnc: encryptPhi(r.dob),
+          memberIdEnc: encryptPhi(r.member_id),
+          insurancePayerId: payer.id,
         },
-      },
-      update: { insurancePayerId: payer.id },
-      create: {
-        practiceId: user.practiceId,
-        externalId: r.external_patient_id,
-        firstNameEnc: encryptPhi(r.first_name),
-        lastNameEnc: encryptPhi(r.last_name),
-        dobEnc: encryptPhi(r.dob),
-        memberIdEnc: encryptPhi(r.member_id),
-        insurancePayerId: payer.id,
-      },
-    });
+      });
 
-    const claim = await prisma.claim.create({
-      data: {
-        practiceId: user.practiceId,
-        patientId: patient.id,
-        payerId: payer.id,
-        serviceDate: new Date(r.service_date),
-        cptCodes: r.cpt.split(/\s+/).filter(Boolean),
-        icdCodes: r.icd.split(/\s+/).filter(Boolean),
-        billedAmount: r.billed_amount,
-        status: "DENIED",
-        submittedAt: new Date(r.submitted_at),
-      },
-    });
+      const claim = await prisma.claim.create({
+        data: {
+          practiceId: user.practiceId,
+          patientId: patient.id,
+          payerId: payer.id,
+          serviceDate: new Date(r.service_date),
+          cptCodes: r.cpt.split(/\s+/).filter(Boolean),
+          icdCodes: r.icd.split(/\s+/).filter(Boolean),
+          billedAmount: r.billed_amount,
+          status: "DENIED",
+          submittedAt: new Date(r.submitted_at),
+        },
+      });
 
-    await prisma.denial.create({
-      data: {
-        claimId: claim.id,
-        denialCode: r.denial_code,
-        denialReason: r.denial_reason,
-        deniedAmount: r.denied_amount,
-        eraRawText: r.era_raw,
-        receivedAt: new Date(r.received_at),
-      },
-    });
+      await prisma.denial.create({
+        data: {
+          claimId: claim.id,
+          denialCode: r.denial_code,
+          denialReason: r.denial_reason,
+          deniedAmount: r.denied_amount,
+          eraRawText: r.era_raw,
+          receivedAt: new Date(r.received_at),
+        },
+      });
 
-    created++;
-  }
+      created++;
+    }
 
-  return NextResponse.json({ created });
-}
+    return { created };
+  },
+);

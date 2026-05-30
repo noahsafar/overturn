@@ -1,5 +1,4 @@
-// Prisma schema — Phase 1 MVP.
-// Matches the spec in `DEV SPEC.md` § Database Schema.
+// Prisma schema — Overturn.
 // pgvector is enabled via the postgresqlExtensions preview feature.
 
 generator client {
@@ -14,31 +13,68 @@ datasource db {
 }
 
 model Practice {
-  id        String    @id @default(cuid())
-  name      String
-  npi       String    @unique
-  taxId     String
-  specialty String
-  createdAt DateTime  @default(now())
-  patients  Patient[]
-  claims    Claim[]
-  users     User[]
+  id                     String           @id @default(cuid())
+  name                   String
+  npi                    String           @unique
+  taxId                  String
+  specialty              String
+  billingEmail           String?
+  stripeCustomerId       String?          @unique
+  // 2500 = 25%, in basis points. Default lines up with the pricing model.
+  recoveryFeeBps         Int              @default(2500)
+  onboardingCompletedAt  DateTime?
+  clearinghouseSftpHost  String?
+  clearinghouseSftpUser  String?
+  clearinghouseSftpPathEnc Bytes?
+  createdAt              DateTime         @default(now())
+  patients               Patient[]
+  claims                 Claim[]
+  users                  User[]
+  payerCredentials       PayerCredential[]
+  invitations            Invitation[]
+  invoices               Invoice[]
+  auditEvents            AuditEvent[]
+  notifications          Notification[]
+  followUpChecks         FollowUpCheck[]
 }
 
 model User {
-  id         String   @id @default(cuid())
-  clerkId    String   @unique
-  email      String
-  practiceId String
-  practice   Practice @relation(fields: [practiceId], references: [id])
-  role       UserRole @default(STAFF)
-  createdAt  DateTime @default(now())
+  id           String        @id @default(cuid())
+  clerkId      String        @unique
+  email        String
+  name         String?
+  practiceId   String
+  practice     Practice      @relation(fields: [practiceId], references: [id])
+  role         UserRole      @default(STAFF)
+  lastLoginAt  DateTime?
+  invitedById  String?
+  invitedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  invitationsCreated Invitation[] @relation("InvitationCreatedBy")
+  auditEvents  AuditEvent[]
+  reviewsAuthored HumanReview[] @relation("HumanReviewReviewer")
 }
 
 enum UserRole {
   OWNER
   ADMIN
   STAFF
+}
+
+model Invitation {
+  id           String   @id @default(cuid())
+  practiceId   String
+  practice     Practice @relation(fields: [practiceId], references: [id])
+  email        String
+  role         UserRole @default(STAFF)
+  token        String   @unique
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdById  String
+  createdBy    User     @relation("InvitationCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([practiceId, email])
 }
 
 model Patient {
@@ -59,17 +95,18 @@ model Patient {
 }
 
 model Payer {
-  id             String        @id @default(cuid())
-  name           String
-  payerIdNumbers String[]
-  portalUrl      String?
-  ivrPhone       String?
-  faxNumber      String?
-  appealAddress  String?
-  epaSupported   Boolean       @default(false)
-  patients       Patient[]
-  claims         Claim[]
-  policies       PayerPolicy[]
+  id               String            @id @default(cuid())
+  name             String
+  payerIdNumbers   String[]
+  portalUrl        String?
+  ivrPhone         String?
+  faxNumber        String?
+  appealAddress    String?
+  epaSupported     Boolean           @default(false)
+  patients         Patient[]
+  claims           Claim[]
+  policies         PayerPolicy[]
+  payerCredentials PayerCredential[]
 }
 
 model PayerPolicy {
@@ -87,24 +124,47 @@ model PayerPolicy {
   @@index([payerId, denialCode])
 }
 
+// Per-(practice, payer) encrypted credentials for portal/SFTP access.
+model PayerCredential {
+  id              String    @id @default(cuid())
+  practiceId      String
+  practice        Practice  @relation(fields: [practiceId], references: [id])
+  payerId         String
+  payer           Payer     @relation(fields: [payerId], references: [id])
+  // PORTAL | SFTP | API
+  credentialType  String    @default("PORTAL")
+  usernameEnc     Bytes
+  passwordEnc     Bytes
+  mfaSecretEnc    Bytes?
+  configJson      Json?
+  createdAt       DateTime  @default(now())
+  rotatedAt       DateTime?
+
+  @@unique([practiceId, payerId, credentialType])
+}
+
 model Claim {
-  id           String      @id @default(cuid())
-  practiceId   String
-  practice     Practice    @relation(fields: [practiceId], references: [id])
-  patientId    String
-  patient      Patient     @relation(fields: [patientId], references: [id])
-  payerId      String
-  payer        Payer       @relation(fields: [payerId], references: [id])
-  serviceDate  DateTime
-  cptCodes     String[]
-  icdCodes     String[]
-  billedAmount Decimal     @db.Decimal(10, 2)
-  status       ClaimStatus @default(SUBMITTED)
-  submittedAt  DateTime
-  denials      Denial[]
-  createdAt    DateTime    @default(now())
+  id              String      @id @default(cuid())
+  practiceId      String
+  practice        Practice    @relation(fields: [practiceId], references: [id])
+  patientId       String
+  patient         Patient     @relation(fields: [patientId], references: [id])
+  payerId         String
+  payer           Payer       @relation(fields: [payerId], references: [id])
+  serviceDate     DateTime
+  cptCodes        String[]
+  icdCodes        String[]
+  billedAmount    Decimal     @db.Decimal(10, 2)
+  // Optional: control number as known by the clearinghouse / payer. Used to
+  // match incoming ERAs and follow-up payments to the originating claim.
+  controlNumber   String?
+  status          ClaimStatus @default(SUBMITTED)
+  submittedAt     DateTime
+  denials         Denial[]
+  createdAt       DateTime    @default(now())
 
   @@index([practiceId, status])
+  @@index([controlNumber])
 }
 
 enum ClaimStatus {
@@ -132,25 +192,54 @@ model Denial {
 }
 
 model Appeal {
-  id              String    @id @default(cuid())
-  denialId        String
-  denial          Denial    @relation(fields: [denialId], references: [id])
-  draftLetter     String    @db.Text
-  templateUsed    String
-  citations       Json
-  status          String    @default("PENDING")
-  submittedVia    String?
-  submittedAt     DateTime?
-  outcome         String    @default("PENDING")
-  recoveredAmount Decimal?  @db.Decimal(10, 2)
-  ourFee          Decimal?  @db.Decimal(10, 2)
-  agentRunId      String?
-  agentRun        AgentRun? @relation(fields: [agentRunId], references: [id])
-  humanReviewId   String?
-  humanReview     HumanReview? @relation(fields: [humanReviewId], references: [id])
-  createdAt       DateTime  @default(now())
+  id                 String       @id @default(cuid())
+  denialId           String
+  denial             Denial       @relation(fields: [denialId], references: [id])
+  draftLetter        String       @db.Text
+  templateUsed       String
+  citations          Json
+  status             String       @default("PENDING")
+  submittedVia       String?
+  submittedAt        DateTime?
+  outcome            String       @default("PENDING")
+  recoveredAmount    Decimal?     @db.Decimal(10, 2)
+  ourFee             Decimal?     @db.Decimal(10, 2)
+  outcomeRecordedAt  DateTime?
+  agentRunId         String?
+  agentRun           AgentRun?    @relation(fields: [agentRunId], references: [id])
+  humanReviewId      String?
+  humanReview        HumanReview? @relation(fields: [humanReviewId], references: [id])
+  submissions        Submission[]
+  invoiceLineItem    InvoiceLineItem?
+  followUpChecks     FollowUpCheck[]
+  createdAt          DateTime     @default(now())
 
   @@index([outcome])
+}
+
+// One row per submission attempt — portal/fax/mail/epa. Multiple per Appeal
+// if a retry happens. This is the audit trail customers will ask about.
+model Submission {
+  id                 String   @id @default(cuid())
+  appealId           String
+  appeal             Appeal   @relation(fields: [appealId], references: [id])
+  // PORTAL | FAX | MAIL | EPA_API
+  channel            String
+  attemptNumber      Int      @default(1)
+  // QUEUED | RUNNING | SUCCESS | FAILED
+  status             String   @default("QUEUED")
+  confirmationNumber String?
+  // External provider reference (Documo job id, Lob letter id, etc.)
+  providerRef        String?
+  errorMessage       String?  @db.Text
+  // Array of screenshot/audit URLs (S3 keys in prod, file paths in dev)
+  screenshots        Json?
+  // Idempotency key — same key on retry must NOT create a duplicate downstream submission.
+  idempotencyKey     String   @unique
+  startedAt          DateTime @default(now())
+  completedAt        DateTime?
+
+  @@index([appealId, attemptNumber])
 }
 
 model AgentRun {
@@ -169,17 +258,116 @@ model AgentRun {
 }
 
 model HumanReview {
-  id         String         @id @default(cuid())
-  reviewerId String
-  decision   ReviewDecision
-  reviewedAt DateTime       @default(now())
-  editsMade  String?        @db.Text
-  notes      String?        @db.Text
-  appeals    Appeal[]
+  id          String          @id @default(cuid())
+  reviewerId  String
+  reviewer    User?           @relation("HumanReviewReviewer", fields: [reviewerId], references: [id])
+  decision    ReviewDecision
+  reviewedAt  DateTime        @default(now())
+  editsMade   String?         @db.Text
+  notes       String?         @db.Text
+  appeals     Appeal[]
 }
 
 enum ReviewDecision {
   APPROVED
   REJECTED
   EDITED_AND_APPROVED
+}
+
+// Scheduled status checks 14 / 30 / 60 days after submission. The Temporal
+// FollowUpCheckWorkflow writes one of these per scheduled tick.
+model FollowUpCheck {
+  id           String    @id @default(cuid())
+  appealId     String
+  appeal       Appeal    @relation(fields: [appealId], references: [id])
+  practiceId   String
+  practice     Practice  @relation(fields: [practiceId], references: [id])
+  scheduledFor DateTime
+  // PENDING | COMPLETED | FAILED
+  status       String    @default("PENDING")
+  outcome      String?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([scheduledFor, status])
+  @@index([appealId])
+}
+
+// Monthly invoice for recovery fees. One per (practice, period).
+model Invoice {
+  id              String            @id @default(cuid())
+  practiceId      String
+  practice        Practice          @relation(fields: [practiceId], references: [id])
+  periodStart     DateTime
+  periodEnd       DateTime
+  // DRAFT | OPEN | PAID | VOID | UNCOLLECTIBLE
+  status          String            @default("DRAFT")
+  totalCents      Int               @default(0)
+  stripeInvoiceId String?           @unique
+  stripeHostedUrl String?
+  createdAt       DateTime          @default(now())
+  issuedAt        DateTime?
+  paidAt          DateTime?
+  lineItems       InvoiceLineItem[]
+
+  @@unique([practiceId, periodStart, periodEnd])
+  @@index([practiceId, status])
+}
+
+model InvoiceLineItem {
+  id              String    @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id])
+  // One line per recovered Appeal. Unique so we cannot double-charge a recovery.
+  appealId        String    @unique
+  appeal          Appeal    @relation(fields: [appealId], references: [id])
+  description     String
+  recoveredAmount Decimal   @db.Decimal(10, 2)
+  feeCents        Int
+  createdAt       DateTime  @default(now())
+
+  @@index([invoiceId])
+}
+
+// Append-only audit trail of every PHI-touching operation. Never delete rows.
+model AuditEvent {
+  id           String    @id @default(cuid())
+  practiceId   String
+  practice     Practice  @relation(fields: [practiceId], references: [id])
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+  // e.g. "appeal.view", "denial.list", "patient.decrypt", "submission.send"
+  action       String
+  // Polymorphic — "appeal" / "denial" / "patient" / "invoice" / etc.
+  resourceType String
+  resourceId   String?
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([practiceId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  practiceId   String
+  practice     Practice  @relation(fields: [practiceId], references: [id])
+  // EMAIL | SMS | IN_APP
+  channel      String    @default("EMAIL")
+  template     String
+  recipient    String
+  subject      String?
+  body         String?   @db.Text
+  // QUEUED | SENT | FAILED
+  status       String    @default("QUEUED")
+  providerRef  String?
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([practiceId, createdAt])
+  @@index([status])
 }

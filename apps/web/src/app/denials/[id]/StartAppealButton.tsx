@@ -44,7 +44,7 @@ export function StartAppealButton({ denialId, label = "Start appeal" }: { denial
               return createdTime >= startTime;
             });
 
-            if (newAppeals.length > 0) {
+            if (newAppeals[0]) {
               newAppealId = newAppeals[0].id;
               break;
             }

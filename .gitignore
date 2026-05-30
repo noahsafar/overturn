@@ -17,3 +17,4 @@ prisma/migrations/dev.db*
 /scripts/.tmp/
 artifacts/
 audit-screenshots/
+*.tsbuildinfo

@@ -44,4 +44,16 @@ export const worker = {
       { appealId, letter, prompt },
     );
   },
+  ingestOutcomes(era: string) {
+    return call<{
+      updates: Array<{
+        appealId: string;
+        claimControlNumber: string;
+        outcome: "WON" | "PARTIAL" | "LOST";
+        recoveredAmount: number;
+        feeCents: number;
+        invoiceId: string;
+      }>;
+    }>("/internal/ingest-outcomes", { era });
+  },
 };

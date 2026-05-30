@@ -46,6 +46,10 @@ class EraParseReq(BaseModel):
     era: str
 
 
+class IngestOutcomesReq(BaseModel):
+    era: str
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"ok": True}
@@ -132,4 +136,33 @@ async def parse_era(req: EraParseReq) -> dict:
         }
     except Exception as e:
         logger.error(f"ERA parsing failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
+@app.post("/internal/ingest-outcomes")
+async def ingest_outcomes(req: IngestOutcomesReq) -> dict:
+    """Match a new ERA against open appeals and record outcomes.
+
+    Idempotent: an Appeal that already has an InvoiceLineItem won't get
+    re-billed. An Appeal whose outcome is already terminal won't be touched.
+    """
+    try:
+        from .outcomes import ingest_era_outcomes
+
+        updates = ingest_era_outcomes(req.era)
+        return {
+            "updates": [
+                {
+                    "appealId": u.appeal_id,
+                    "claimControlNumber": u.claim_control_number,
+                    "outcome": u.outcome,
+                    "recoveredAmount": u.recovered_amount,
+                    "feeCents": u.fee_cents,
+                    "invoiceId": u.invoice_id,
+                }
+                for u in updates
+            ]
+        }
+    except Exception as e:
+        logger.exception(f"outcome ingest failed: {e}")
         raise HTTPException(500, str(e)) from e

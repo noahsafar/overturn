@@ -14,18 +14,42 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile || pnpm install
-      - run: pnpm --filter @claimwell/db generate
-      - run: pnpm --filter @claimwell/shared test
-      - run: pnpm --filter @claimwell/prompts test
-      - run: pnpm --filter @claimwell/db test
-      - run: pnpm --filter @claimwell/web typecheck
+      - run: pnpm --filter @overturn/db generate
+      - run: pnpm --filter @overturn/shared test
+      - run: pnpm --filter @overturn/prompts test
+      - run: pnpm --filter @overturn/db test
+      - run: pnpm --filter @overturn/web typecheck
+      - run: pnpm --filter @overturn/web test
+      - run: pnpm --filter @overturn/web build
 
   py:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: overturn
+          POSTGRES_PASSWORD: overturn
+          POSTGRES_DB: overturn
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd="pg_isready -U overturn" --health-interval=5s
+          --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: postgresql://overturn:overturn@localhost:5433/overturn
+      PHI_ENC_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
       - run: pip install uv
-      - run: cd apps/worker && uv pip install --system -e ".[dev]"
+      - run: pnpm install --frozen-lockfile || pnpm install
+      - run: pnpm --filter @overturn/db generate
+      - name: Push schema to test DB
+        run: cd packages/db && pnpm exec prisma db push --accept-data-loss
+      - run: cd apps/worker && uv pip install --system -e ".[dev,era]"
       - run: cd apps/worker && pytest -q

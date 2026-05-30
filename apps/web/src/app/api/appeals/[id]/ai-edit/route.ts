@@ -1,40 +1,37 @@
 // POST /api/appeals/:id/ai-edit
 //
-// AI-powered appeal letter editing. Takes the current letter and a user prompt,
-// then calls the worker to generate a revised version.
-
-import { NextResponse } from "next/server";
+// AI-powered appeal letter editing. Takes the current letter and a user
+// prompt, then calls the worker to generate a revised version.
+import { z } from "zod";
 import { prisma } from "@overturn/db";
-import { requireUser } from "@/lib/auth";
+import { apiHandler, notFound } from "@/lib/api";
 import { worker } from "@/lib/worker";
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params;
-  let user;
-  try { user = await requireUser(); } catch { return new NextResponse("unauthenticated", { status: 401 }); }
+const ParamsSchema = z.object({ id: z.string().min(1) });
+const BodySchema = z.object({
+  letter: z.string().min(50).max(50_000),
+  prompt: z.string().min(1).max(2_000),
+});
 
-  const appeal = await prisma.appeal.findFirst({
-    where: { id, denial: { claim: { practiceId: user.practiceId } } },
-    include: {
-      denial: { include: { claim: { include: { payer: true } } } },
-    },
-  });
-  if (!appeal) return new NextResponse("not found", { status: 404 });
-
-  const body = await req.json();
-  const { letter, prompt } = body as { letter: string; prompt: string };
-
-  if (!letter || !prompt) {
-    return new NextResponse("letter and prompt are required", { status: 400 });
-  }
-
-  try {
-    const result = await worker.aiEditAppeal(appeal.id, letter, prompt);
-    return NextResponse.json(result);
-  } catch (e) {
-    return new NextResponse(`AI edit failed: ${(e as Error).message}`, { status: 502 });
-  }
-}
+export const POST = apiHandler(
+  {
+    paramsSchema: ParamsSchema,
+    bodySchema: BodySchema,
+    audit: ({ params }) => ({
+      action: "appeal.ai_edit",
+      resourceType: "appeal",
+      resourceId: params.id,
+    }),
+  },
+  async ({ user, params, body }) => {
+    const appeal = await prisma.appeal.findFirst({
+      where: { id: params.id, denial: { claim: { practiceId: user.practiceId } } },
+    });
+    if (!appeal) throw notFound();
+    try {
+      return await worker.aiEditAppeal(appeal.id, body.letter, body.prompt);
+    } catch (e) {
+      return new Response(`AI edit failed: ${(e as Error).message}`, { status: 502 });
+    }
+  },
+);

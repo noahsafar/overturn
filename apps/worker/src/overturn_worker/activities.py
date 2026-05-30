@@ -21,8 +21,13 @@ from temporalio import activity
 
 from .citations import Citation, PolicyDoc, verify_citations
 from .crypto import decrypt
+from .documo import send_fax
 from .llm import call_claude_json
-from .models import AgentRun, Appeal, Claim, Denial, Payer, PayerPolicy, SessionLocal
+from .lob import send_letter
+from .models import (
+    AgentRun, Appeal, Claim, Denial, Payer, PayerPolicy, SessionLocal, Submission,
+)
+from .pdf import AppealLetterPdfInput, render_appeal_letter_pdf
 from .prompts import DRAFT_V1, REDRAFT_V1, STRATEGIZE_V1, render
 from .retrieval import retrieve_policies
 
@@ -435,6 +440,15 @@ async def save_appeal_draft(
         appeal.citations = draft.get("citations", [])
         appeal.agentRunId = run_id
         s.commit()
+
+    # Fire-and-forget notification to web — best effort, doesn't block the
+    # workflow if the web isn't reachable.
+    try:
+        from .web_client import notify_appeal_ready
+        notify_appeal_ready(appeal_id)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("notify_appeal_ready failed: %s", e)
+
     return appeal_id
 
 
@@ -488,15 +502,25 @@ async def load_appeal(appeal_id: str) -> dict:
         a = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
         if a is None:
             raise ValueError(f"appeal {appeal_id} not found")
+        claim = a.denial.claim
+        patient = claim.patient
+        practice = claim.practice
+        try:
+            member_id = decrypt(patient.memberIdEnc)
+        except Exception:
+            member_id = ""
         return {
             "id": a.id,
             "denial_id": a.denialId,
-            "claim_id": a.denial.claimId,
-            "payer_id": a.denial.claim.payerId,
+            "claim_id": claim.id,
+            "payer_id": claim.payerId,
             "letter": a.draftLetter,
             "primary_reason": (a.citations[0]["policyId"] if a.citations else "appeal"),
             "denied_amount": float(a.denial.deniedAmount),
-            "claim_control_number": a.denial.claimId[:12],
+            "claim_control_number": claim.controlNumber or claim.id[:12],
+            "service_date": claim.serviceDate.strftime("%Y-%m-%d"),
+            "practice_name": practice.name,
+            "patient_member_id": member_id,
         }
 
 
@@ -528,47 +552,125 @@ async def browser_agent_submit_portal(appeal: dict, payer: dict) -> dict:
     return await submit_via_portal(appeal, payer)
 
 
+def _build_pdf_input(appeal: dict, payer: dict) -> AppealLetterPdfInput:
+    # Best-effort fields; many of these come from `load_appeal` and are not
+    # always populated in tests. We default rather than fail loudly.
+    return AppealLetterPdfInput(
+        appeal_id=appeal["id"],
+        letter_text=appeal.get("letter") or "",
+        practice_name=appeal.get("practice_name") or "Practice",
+        payer_name=payer.get("name") or "Payer",
+        payer_appeal_address=payer.get("appeal_address"),
+        claim_control_number=appeal.get("claim_control_number") or "",
+        patient_member_id=appeal.get("patient_member_id") or "",
+        service_date=appeal.get("service_date") or "",
+        denied_amount=float(appeal.get("denied_amount") or 0),
+    )
+
+
+def _record_submission(
+    appeal_id: str,
+    channel: str,
+    provider_ref: str,
+    confirmation: str,
+    pdf_path: str,
+    success: bool,
+    error: str | None,
+) -> str:
+    """Insert a Submission row capturing this attempt. Returns the Submission id."""
+    now = datetime.utcnow()
+    sub_id = "cm" + uuid.uuid4().hex[:22]
+    idem = f"{channel}-{appeal_id}-{provider_ref or 'no-ref'}-{uuid.uuid4().hex[:8]}"
+    with SessionLocal() as s:
+        # Determine attempt number — count existing Submissions for this appeal.
+        from sqlalchemy import select
+
+        existing = s.execute(
+            select(Submission.id).where(Submission.appealId == appeal_id)
+        ).all()
+        attempt = len(existing) + 1
+        screenshots = [pdf_path] if pdf_path else []
+        s.add(
+            Submission(
+                id=sub_id,
+                appealId=appeal_id,
+                channel=channel,
+                attemptNumber=attempt,
+                status="SUCCESS" if success else "FAILED",
+                confirmationNumber=confirmation if success else None,
+                providerRef=provider_ref or None,
+                errorMessage=error,
+                screenshots=screenshots if screenshots else None,
+                idempotencyKey=idem,
+                startedAt=now,
+                completedAt=now,
+            )
+        )
+        s.commit()
+    return sub_id
+
+
 @activity.defn
 async def fax_submit_appeal(appeal: dict, payer: dict) -> dict:
-    """Fallback: queue a fax submission. In production this hits an eFax
-    provider with a BAA (e.g. Documo, Concord); here we record an artifact
-    file and return a synthesized confirmation number."""
-    import os
-
-    from .config import SETTINGS
-
-    os.makedirs(f"{SETTINGS.artifacts_dir}/faxes", exist_ok=True)
-    path = f"{SETTINGS.artifacts_dir}/faxes/{appeal['id']}.txt"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(f"FAX TO: {payer['fax_number']}\n\n{appeal['letter']}")
+    """Submit an appeal via Documo eFax. Falls back to a stub when no Documo
+    API key is set (still produces a PDF artifact + synthetic confirmation)."""
+    pdf_input = _build_pdf_input(appeal, payer)
+    pdf_bytes = render_appeal_letter_pdf(pdf_input)
+    fax_number = payer.get("fax_number") or ""
+    result = send_fax(
+        pdf_bytes=pdf_bytes,
+        appeal_id=appeal["id"],
+        fax_number=fax_number,
+        subject=f"Appeal — claim {appeal.get('claim_control_number') or appeal['id']}",
+    )
+    _record_submission(
+        appeal_id=appeal["id"],
+        channel="FAX",
+        provider_ref=result.provider_ref,
+        confirmation=result.confirmation_number,
+        pdf_path=result.pdf_path,
+        success=result.success,
+        error=result.error,
+    )
     return {
-        "success": True,
+        "success": result.success,
         "channel": "FAX",
-        "confirmation_number": f"FAX-{appeal['id'][-8:]}",
+        "confirmation_number": result.confirmation_number,
         "submitted_at": datetime.utcnow().isoformat(),
-        "screenshots": [],
+        "screenshots": [result.pdf_path] if result.pdf_path else [],
+        "errorMessage": result.error,
     }
 
 
 @activity.defn
 async def mail_queue_appeal(appeal: dict, payer: dict) -> dict:
-    """Last-resort: queue for physical mail. Writes a PDF-ready text artifact."""
-    import os
-
-    from .config import SETTINGS
-
-    os.makedirs(f"{SETTINGS.artifacts_dir}/mail", exist_ok=True)
-    path = f"{SETTINGS.artifacts_dir}/mail/{appeal['id']}.txt"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(
-            f"TO: {payer['name']}\n{payer['appeal_address']}\n\n{appeal['letter']}"
-        )
+    """Submit an appeal as physical mail via Lob. Stub fallback writes the
+    PDF to the artifacts directory."""
+    pdf_input = _build_pdf_input(appeal, payer)
+    pdf_bytes = render_appeal_letter_pdf(pdf_input)
+    result = send_letter(
+        pdf_bytes=pdf_bytes,
+        appeal_id=appeal["id"],
+        payer_name=payer.get("name") or "Payer",
+        payer_appeal_address=payer.get("appeal_address") or "",
+        from_name=appeal.get("practice_name") or "Practice",
+    )
+    _record_submission(
+        appeal_id=appeal["id"],
+        channel="MAIL",
+        provider_ref=result.provider_ref,
+        confirmation=result.confirmation_number,
+        pdf_path=result.pdf_path,
+        success=result.success,
+        error=result.error,
+    )
     return {
-        "success": True,
+        "success": result.success,
         "channel": "MAIL",
-        "confirmation_number": f"MAIL-{appeal['id'][-8:]}",
+        "confirmation_number": result.confirmation_number,
         "submitted_at": datetime.utcnow().isoformat(),
-        "screenshots": [],
+        "screenshots": [result.pdf_path] if result.pdf_path else [],
+        "errorMessage": result.error,
     }
 
 

@@ -9,6 +9,10 @@ import {
   DocumentTextIcon,
   ArrowUpTrayIcon,
   BuildingOffice2Icon,
+  BanknotesIcon,
+  ShieldCheckIcon,
+  UsersIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
 const nav = [
@@ -16,7 +20,11 @@ const nav = [
   { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
   { name: "Denials", href: "/denials", icon: DocumentTextIcon },
   { name: "Upload", href: "/upload", icon: ArrowUpTrayIcon },
+  { name: "Invoices", href: "/invoices", icon: BanknotesIcon },
+  { name: "Reports", href: "/reports", icon: ChartPieIcon },
   { name: "Payers", href: "/settings/payers", icon: BuildingOffice2Icon },
+  { name: "Members", href: "/settings/members", icon: UsersIcon },
+  { name: "Audit log", href: "/settings/audit", icon: ShieldCheckIcon },
 ];
 
 export function Sidebar() {

@@ -1,10 +1,9 @@
-// POST /api/era/upload
+// POST /api/era/upload — accept an 835 ERA file and ingest denials.
 //
-// Accepts an ERA/835 file and creates denials by calling the worker parser.
-
-import { NextResponse, type NextRequest } from "next/server";
+// For the full pipeline (matching to existing claims + creating outcome
+// records on follow-up payments), see the worker-side ingest service.
 import { prisma, encryptPhi } from "@overturn/db";
-import { requireUser } from "@/lib/auth";
+import { apiHandler, badRequest } from "@/lib/api";
 import { worker } from "@/lib/worker";
 
 interface EraClaim {
@@ -12,21 +11,15 @@ interface EraClaim {
   billed: number;
   paid: number;
   denied: number;
-  denials: Array<{
-    code: string;
-    reason: string;
-    amount: number;
-  }>;
+  denials: Array<{ code: string; reason: string; amount: number }>;
 }
 
 interface EraParseResponse {
   claims: EraClaim[];
 }
 
-// Default payer for demo - in production this would come from ERA segments
 const DEMO_PAYER_ID = "seed_payer_bcbs";
 
-// Generate demo patient data for testing
 function generatePatientData(controlNum: string) {
   return {
     externalId: `PT-${controlNum}`,
@@ -37,52 +30,73 @@ function generatePatientData(controlNum: string) {
   };
 }
 
-export async function POST(req: NextRequest) {
-  let user;
-  try { user = await requireUser(); } catch { return new NextResponse("unauthenticated", { status: 401 }); }
+export const POST = apiHandler(
+  {
+    requiredRole: "STAFF",
+    audit: { action: "claims.upload_era", resourceType: "claim" },
+  },
+  async ({ user, req }) => {
+    const formData = await req.formData();
+    const file = formData.get("era") as File | null;
+    if (!file) throw badRequest("No file uploaded");
 
-  const formData = await req.formData();
-  const file = formData.get("era") as File | null;
+    const eraContent = await file.text();
 
-  if (!file) {
-    return new NextResponse("No file uploaded", { status: 400 });
-  }
-
-  const eraContent = await file.text();
-
-  try {
-    // Call worker to parse ERA
-    const response = await fetch(`${process.env.WORKER_INTERNAL_URL ?? "http://localhost:8001"}/internal/parse-era`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ era: eraContent }),
-    });
+    const response = await fetch(
+      `${process.env.WORKER_INTERNAL_URL ?? "http://localhost:8001"}/internal/parse-era`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ era: eraContent }),
+      },
+    );
 
     if (!response.ok) {
       const error = await response.text();
-      return new NextResponse(`ERA parsing failed: ${error}`, { status: 500 });
+      return new Response(`ERA parsing failed: ${error}`, { status: 502 });
     }
 
-    const data = await response.json() as EraParseResponse;
+    const data = (await response.json()) as EraParseResponse;
     let created = 0;
 
-    for (const claimData of data.claims) {
-      // Get or create payer (demo uses seed payer)
-      let payer = await prisma.payer.findUnique({
-        where: { id: DEMO_PAYER_ID },
+    // First pass: record outcomes for any claims that match existing
+    // controlNumbers. This handles the follow-up-payment case where a
+    // previously-denied claim is now paid.
+    let outcomesRecorded = 0;
+    let totalFeeCents = 0;
+    try {
+      const outcome = await worker.ingestOutcomes(eraContent);
+      outcomesRecorded = outcome.updates.length;
+      totalFeeCents = outcome.updates.reduce((s, u) => s + u.feeCents, 0);
+    } catch (e) {
+      // Outcome ingest failures are non-fatal — we still want to create
+      // new denial rows below.
+      console.error("[era/upload] outcome ingest failed:", e);
+    }
+
+    let payer = await prisma.payer.findUnique({ where: { id: DEMO_PAYER_ID } });
+    if (!payer) {
+      payer = await prisma.payer.create({
+        data: { id: DEMO_PAYER_ID, name: "Blue Cross Blue Shield" },
       });
+    }
 
-      if (!payer) {
-        // Create demo payer if it doesn't exist
-        payer = await prisma.payer.create({
-          data: {
-            id: DEMO_PAYER_ID,
-            name: "Blue Cross Blue Shield",
-          },
-        });
-      }
+    for (const claimData of data.claims) {
+      // If this controlNumber already corresponds to a known claim in this
+      // practice, skip — the outcome ingest above already handled it.
+      const existing = await prisma.claim.findFirst({
+        where: {
+          practiceId: user.practiceId,
+          controlNumber: claimData.control_number,
+        },
+        select: { id: true },
+      });
+      if (existing) continue;
 
-      // Generate demo patient data
+      // No denials means this ERA segment was a clean payment — nothing
+      // to ingest as a new denial.
+      if (claimData.denials.length === 0) continue;
+
       const patientData = generatePatientData(claimData.control_number);
 
       const patient = await prisma.patient.upsert({
@@ -104,16 +118,16 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Create claim and denials
       const claim = await prisma.claim.create({
         data: {
           practiceId: user.practiceId,
           patientId: patient.id,
           payerId: payer.id,
-          serviceDate: new Date(), // Demo uses today
+          serviceDate: new Date(),
           cptCodes: [],
           icdCodes: [],
           billedAmount: claimData.billed.toString(),
+          controlNumber: claimData.control_number,
           status: "DENIED",
           submittedAt: new Date(),
         },
@@ -134,9 +148,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ created });
-  } catch (error) {
-    console.error("ERA upload error:", error);
-    return new NextResponse(`Upload failed: ${error}`, { status: 500 });
-  }
-}
+    return { created, outcomesRecorded, totalFeeCents };
+  },
+);

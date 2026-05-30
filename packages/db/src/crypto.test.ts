@@ -22,7 +22,9 @@ describe("PHI envelope encryption", () => {
 
   it("rejects tampered ciphertext", () => {
     const blob = encryptPhi("sensitive");
-    blob[blob.length - 1] ^= 0xff;
+    const lastIdx = blob.length - 1;
+    const last = blob[lastIdx];
+    if (last !== undefined) blob[lastIdx] = last ^ 0xff;
     expect(() => decryptPhi(blob)).toThrow();
   });
 });

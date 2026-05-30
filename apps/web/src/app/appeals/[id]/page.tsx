@@ -21,9 +21,17 @@ export default async function AppealPage({
       denial: { include: { claim: { include: { payer: true } } } },
       agentRun: true,
       humanReview: true,
+      submissions: { orderBy: { startedAt: "desc" } },
     },
   });
   if (!appeal) notFound();
+
+  const auditEvents = await prisma.auditEvent.findMany({
+    where: { practiceId: user.practiceId, resourceType: "appeal", resourceId: id },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: { user: { select: { email: true } } },
+  });
 
   const citations = (appeal.citations as Array<{ policyId: string; quote: string; sourceUrl?: string }>) ?? [];
 
@@ -117,6 +125,76 @@ export default async function AppealPage({
           {appeal.submittedAt && (
             <section className="bg-green-50 border border-green-200 rounded p-4 text-sm">
               Submitted {fmtDateTime(appeal.submittedAt)} via {appeal.submittedVia}.
+            </section>
+          )}
+
+          {appeal.submissions.length > 0 && (
+            <section>
+              <h2 className="font-semibold text-brand-900 mb-2">Submission history</h2>
+              <ul className="space-y-2">
+                {appeal.submissions.map((sub) => (
+                  <li
+                    key={sub.id}
+                    className="bg-white border border-gray-200 rounded p-3 text-sm space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-mono text-xs text-gray-500">#{sub.attemptNumber}</span>
+                        <span className="ml-2 font-medium text-gray-900">{sub.channel}</span>
+                        <span
+                          className={`ml-2 inline-block px-2 py-0.5 rounded text-xs ${
+                            sub.status === "SUCCESS"
+                              ? "bg-success-50 text-success-700"
+                              : sub.status === "FAILED"
+                                ? "bg-error-50 text-error-700"
+                                : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {sub.status}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {fmtDateTime(sub.startedAt)}
+                      </span>
+                    </div>
+                    {sub.confirmationNumber && (
+                      <div className="text-xs text-gray-600">
+                        Confirmation: <span className="font-mono">{sub.confirmationNumber}</span>
+                      </div>
+                    )}
+                    {sub.providerRef && (
+                      <div className="text-xs text-gray-500">
+                        Provider ref: <span className="font-mono">{sub.providerRef}</span>
+                      </div>
+                    )}
+                    {sub.errorMessage && (
+                      <div className="text-xs text-error-700">{sub.errorMessage}</div>
+                    )}
+                    {sub.screenshots && Array.isArray(sub.screenshots) && sub.screenshots.length > 0 && (
+                      <div className="text-xs text-gray-500">
+                        {sub.screenshots.length} artifact(s) captured
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {auditEvents.length > 0 && (
+            <section>
+              <h2 className="font-semibold text-brand-900 mb-2">Activity</h2>
+              <ul className="space-y-1 text-xs">
+                {auditEvents.map((e) => (
+                  <li key={e.id} className="flex justify-between text-gray-600 py-1 border-b border-gray-100 last:border-b-0">
+                    <span>
+                      <code className="font-mono text-gray-800">{e.action}</code>
+                      {e.user?.email && <span className="ml-2 text-gray-500">by {e.user.email}</span>}
+                    </span>
+                    <span className="tabular-nums text-gray-400">{fmtDateTime(e.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
         </>
