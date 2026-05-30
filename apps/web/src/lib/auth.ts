@@ -49,3 +49,43 @@ export async function requireUser(): Promise<SessionUser> {
   if (!u) throw new Error("UNAUTHENTICATED");
   return u;
 }
+
+// ── Superuser (Overturn ops) ──────────────────────────────────────────────
+//
+// A separate axis from the practice-scoped OWNER/ADMIN/STAFF roles. Superusers
+// see ALL practices and have unscoped DB access. Membership is controlled by
+// an env allowlist (`OVERTURN_ADMIN_EMAILS=a@b.com,c@d.com`) rather than a DB
+// column — that way you don't need a migration to grant or revoke, and you
+// can revoke fast by editing env + redeploying.
+//
+// In dev with no Clerk + no allowlist, the seeded dev_user is treated as a
+// superuser so you can exercise the admin surface locally.
+
+function parseAllowlist(): Set<string> {
+  const raw = process.env.OVERTURN_ADMIN_EMAILS ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function isSuperuser(user: { email: string } | null | undefined): boolean {
+  if (!user?.email) return false;
+  const allow = parseAllowlist();
+  // Dev fallback: if no allowlist configured AND we're in dev_auth mode, treat
+  // the seeded dev_user as superuser so the admin UI is reachable locally.
+  if (allow.size === 0 && devModeEnabled()) {
+    return user.email === "dev@overturn.local";
+  }
+  return allow.has(user.email.toLowerCase());
+}
+
+export async function requireSuperuser(): Promise<SessionUser> {
+  const u = await requireUser();
+  if (!isSuperuser(u)) {
+    throw new Error("FORBIDDEN");
+  }
+  return u;
+}

@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Sidebar } from "@/components/Sidebar";
+import { currentUser, isSuperuser } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Overturn",
@@ -17,12 +18,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = await currentUser().catch(() => null);
+  const showAdminLink = isSuperuser(user);
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
         <div className="flex min-h-screen">
-          <Sidebar />
+          <Sidebar showAdminLink={showAdminLink} />
           <main className="flex-1 overflow-x-hidden">
             <div className="mx-auto max-w-6xl px-8 py-10">{children}</div>
           </main>

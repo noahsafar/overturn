@@ -16,7 +16,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodTypeAny, z } from "zod";
 import { prisma } from "@overturn/db";
-import { requireUser, type SessionUser } from "./auth";
+import { isSuperuser, requireUser, type SessionUser } from "./auth";
 import { rateLimit } from "./rate-limit";
 
 export type Role = "OWNER" | "ADMIN" | "STAFF";
@@ -47,6 +47,11 @@ export interface ApiContext<TParams = unknown, TBody = unknown> {
 
 export interface HandlerOptions<TParamsSchema extends ZodTypeAny, TBodySchema extends ZodTypeAny> {
   requiredRole?: Role;
+  /**
+   * Require Overturn-internal superuser access (cross-tenant). Independent of
+   * the practice-scoped `requiredRole` axis. Used by /api/admin/* routes.
+   */
+  superuserOnly?: boolean;
   paramsSchema?: TParamsSchema;
   bodySchema?: TBodySchema;
   audit?: AuditMeta | ((ctx: { user: SessionUser; params: z.infer<TParamsSchema> }) => AuditMeta);
@@ -124,6 +129,9 @@ export function apiHandler<
 
     // 2. Role
     if (options.requiredRole && !roleAtLeast(user.role, options.requiredRole)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (options.superuserOnly && !isSuperuser(user)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 

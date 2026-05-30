@@ -13,6 +13,7 @@ import {
   ShieldCheckIcon,
   UsersIcon,
   ChartPieIcon,
+  CommandLineIcon,
 } from "@heroicons/react/24/outline";
 
 const nav = [
@@ -27,7 +28,7 @@ const nav = [
   { name: "Audit log", href: "/settings/audit", icon: ShieldCheckIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ showAdminLink = false }: { showAdminLink?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -61,6 +62,21 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {showAdminLink && (
+        <div className="border-t border-gray-200 p-3">
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            <CommandLineIcon className="h-5 w-5 text-gray-400" />
+            <span>Ops console</span>
+            <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-400">
+              admin
+            </span>
+          </Link>
+        </div>
+      )}
 
       <div className="border-t border-gray-200 p-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
