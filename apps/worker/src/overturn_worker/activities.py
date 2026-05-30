@@ -481,6 +481,7 @@ async def save_skipped_appeal(denial_id: str, reason: str) -> str:
                 draftLetter=f"(skipped — {reason})",
                 templateUsed="skipped",
                 citations=[],
+                status="SKIPPED",
                 submittedVia=None,
                 submittedAt=None,
                 outcome="SKIPPED",

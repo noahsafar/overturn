@@ -42,10 +42,14 @@ from .config import SETTINGS
 
 
 # Prisma generates postgres URLs without the +psycopg driver hint; normalize.
+# Also handles Heroku's legacy `postgres://` form, which SQLAlchemy refuses
+# to load directly.
 def _engine_url() -> str:
     url = SETTINGS.database_url
     if url.startswith("postgresql://"):
         url = "postgresql+psycopg://" + url[len("postgresql://") :]
+    elif url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://") :]
     return url
 
 
