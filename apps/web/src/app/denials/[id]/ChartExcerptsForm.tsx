@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { StructuredClinicalContext } from "@/components/StructuredClinicalContext";
 
 export function ChartExcerptsForm({
   denialId,
@@ -13,10 +14,10 @@ export function ChartExcerptsForm({
   locked: boolean;
 }) {
   const router = useRouter();
-  const [text, setText] = useState(initialText);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [text, setText] = useState(initialText);
 
   const handleSave = () => {
     setErr(null);
@@ -34,6 +35,12 @@ export function ChartExcerptsForm({
       setSaved(true);
       router.refresh();
     });
+  };
+
+  const handleContextChange = (newContext: string) => {
+    setText(newContext);
+    // Auto-save when context changes (debounced in real implementation)
+    setSaved(false);
   };
 
   if (locked) {
@@ -57,35 +64,38 @@ export function ChartExcerptsForm({
 
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-semibold text-gray-900">Chart excerpts</h3>
-      <p className="mt-1 text-xs text-gray-500">
-        Paste the relevant progress notes, treatment plan, or DSM-5 diagnosis
-        documentation. The AI cites verbatim from this — empty or generic text
-        will (correctly) cause it to skip the appeal as insufficient evidence.
-      </p>
-      <p className="mt-1 text-xs text-gray-500">
-        Separate distinct notes with a blank line.
-      </p>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={12}
-        placeholder="Encounter note 2025-09-15: Patient presents with persistent depressive symptoms. PHQ-9 = 18..."
-        className="mt-3 block w-full rounded border border-gray-300 p-3 font-mono text-xs leading-relaxed text-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-700"
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-gray-900">Clinical Context for Appeal</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Upload clinical documentation or paste from your EHR. The AI cites verbatim from this context — empty or generic text will cause the appeal to be rejected as insufficient evidence.
+        </p>
+      </div>
+
+      <StructuredClinicalContext
+        denialId={denialId}
+        initialContext={initialText}
+        onContextChange={handleContextChange}
       />
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={pending}
-          className="btn-primary disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Save chart excerpts"}
-        </button>
-        {saved && (
-          <span className="text-sm text-success-700">Saved.</span>
-        )}
-        {err && <span className="text-sm text-error-700">{err}</span>}
+
+      <div className="mt-6 border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={pending}
+              className="btn-primary disabled:opacity-50"
+            >
+              {pending ? "Saving…" : "Save clinical context"}
+            </button>
+            {saved && (
+              <span className="text-sm text-success-700 flex items-center">
+                ✓ Saved successfully
+              </span>
+            )}
+            {err && <span className="text-sm text-error-700">{err}</span>}
+          </div>
+        </div>
       </div>
     </div>
   );
