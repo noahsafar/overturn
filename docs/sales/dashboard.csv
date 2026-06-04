@@ -1,0 +1,56 @@
+specialty,total_leads,emails_sent,replies,hot_leads,oon_leads,response_rate
+Physical therapy,53,51,1,1,2,2.0%
+Dermatology,20,20,0,0,0,0.0%
+Behavioral health (counseling),18,17,0,0,1,0.0%
+Chiropractic,8,8,0,0,0,0.0%
+Pediatric therapy,8,8,0,0,0,0.0%
+Behavioral health (psychiatry),6,6,0,0,0,0.0%
+Optometry,5,5,0,0,0,0.0%
+Pediatric speech,5,5,0,0,0,0.0%
+Behavioral health (therapy),4,4,0,0,0,0.0%
+Dental,4,4,0,0,0,0.0%
+Behavioral health (psychiatry+therapy),3,3,0,0,0,0.0%
+Pediatrics,3,3,0,0,0,0.0%
+Primary care,3,3,0,0,0,0.0%
+Acupuncture,3,3,0,0,0,0.0%
+Behavioral health (psychotherapy),2,2,0,0,0,0.0%
+Pediatric PT+OT+speech,2,2,0,0,0,0.0%
+Allergy/Immunology,2,2,0,0,0,0.0%
+Physical therapy (orthopedic),2,2,0,0,0,0.0%
+Dermatology + Mohs,2,2,0,0,0,0.0%
+Psychotherapy,2,2,0,0,0,0.0%
+Physical therapy (sports),2,2,0,0,0,0.0%
+Family medicine,2,2,0,0,0,0.0%
+Behavioral health (therapy + medication),1,1,0,0,0,0.0%
+Behavioral health (child/adolescent),1,1,0,0,0,0.0%
+Behavioral health (psychology),1,1,0,0,0,0.0%
+Podiatry,1,1,0,0,0,0.0%
+PT + counseling,1,1,0,0,0,0.0%
+ENT,1,1,0,0,0,0.0%
+Neurology,1,1,0,0,0,0.0%
+Ophthalmology,1,1,0,0,0,0.0%
+Plastic surgery,1,1,0,0,0,0.0%
+PT (pelvic floor + ortho),1,1,0,0,0,0.0%
+Multidisciplinary rehab,1,1,0,0,0,0.0%
+Physical therapy (manual),1,1,0,0,0,0.0%
+Physical therapy (ortho+pelvic+TMJ),1,1,0,0,0,0.0%
+Pediatric speech/language/feeding,1,1,0,0,0,0.0%
+Pediatric speech/feeding,1,1,0,0,0,0.0%
+Pediatric OT,1,1,0,0,0,0.0%
+Pediatric OT/PT,1,0,0,0,1,0.0%
+Gastroenterology,1,1,0,0,0,0.0%
+Physical therapy (cash-based),1,1,0,0,0,0.0%
+Pelvic floor PT,1,1,0,0,0,0.0%
+Pediatric speech/language,1,1,0,0,0,0.0%
+Acupuncture/Integrative,1,1,0,0,0,0.0%
+Acupuncture/Holistic,1,1,0,0,0,0.0%
+Pain management,1,1,0,0,0,0.0%
+Psychiatry,1,1,0,0,0,0.0%
+Pediatric OT/speech,1,1,0,0,0,0.0%
+Naturopathic medicine,1,1,0,0,0,0.0%
+Acupuncture/integrative,1,1,0,0,0,0.0%
+Behavioral health (adult/child psych),1,1,0,0,0,0.0%
+Pediatric dentistry,1,1,0,0,0,0.0%
+Periodontics,1,1,0,0,0,0.0%
+Physical therapy (pelvic),1,1,0,0,0,0.0%
+Pediatric speech+feeding,1,1,0,0,0,0.0%
