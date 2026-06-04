@@ -2,7 +2,7 @@
 // PATCH /api/practice — update billing + onboarding fields (OWNER/ADMIN).
 import { z } from "zod";
 import { prisma } from "@overturn/db";
-import { apiHandler } from "@/lib/api";
+import { apiHandlerV2 } from "@/lib/api-v2";
 
 const PatchBody = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -11,8 +11,10 @@ const PatchBody = z.object({
   completeOnboarding: z.boolean().optional(),
 });
 
-export const GET = apiHandler(
-  {},
+export const GET = apiHandlerV2(
+  {
+    errorContext: "practice",
+  },
   async ({ user }) => {
     const p = await prisma.practice.findUnique({
       where: { id: user.practiceId },
@@ -31,11 +33,12 @@ export const GET = apiHandler(
   },
 );
 
-export const PATCH = apiHandler(
+export const PATCH = apiHandlerV2(
   {
     bodySchema: PatchBody,
     requiredRole: "ADMIN",
     audit: { action: "practice.update", resourceType: "practice" },
+    errorContext: "practice",
   },
   async ({ user, body }) => {
     const data: Record<string, unknown> = {};

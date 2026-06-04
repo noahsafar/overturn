@@ -8,7 +8,6 @@ import {
   BuildingOfficeIcon,
   ExclamationTriangleIcon,
   HeartIcon,
-  CpuChipIcon,
   ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 
@@ -16,7 +15,6 @@ const nav = [
   { name: "Fleet", href: "/admin", icon: HomeIcon },
   { name: "Practices", href: "/admin/practices", icon: BuildingOfficeIcon },
   { name: "Ops triage", href: "/admin/ops", icon: ExclamationTriangleIcon },
-  { name: "Agents", href: "/admin/agents", icon: CpuChipIcon },
   { name: "Health", href: "/admin/health", icon: HeartIcon },
 ];
 

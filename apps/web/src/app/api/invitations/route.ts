@@ -2,7 +2,7 @@
 // GET  /api/invitations — list pending invitations for the practice.
 import { z } from "zod";
 import { prisma } from "@overturn/db";
-import { apiHandler } from "@/lib/api";
+import { apiHandlerV2 } from "@/lib/api-v2";
 import { createInvitation } from "@/lib/invitations";
 
 const PostBody = z.object({
@@ -10,11 +10,12 @@ const PostBody = z.object({
   role: z.enum(["OWNER", "ADMIN", "STAFF"]).default("STAFF"),
 });
 
-export const POST = apiHandler(
+export const POST = apiHandlerV2(
   {
     bodySchema: PostBody,
     requiredRole: "ADMIN",
     audit: { action: "invitation.create", resourceType: "invitation" },
+    errorContext: "invitation",
   },
   async ({ user, body }) => {
     const inv = await createInvitation({
@@ -27,9 +28,10 @@ export const POST = apiHandler(
   },
 );
 
-export const GET = apiHandler(
+export const GET = apiHandlerV2(
   {
     requiredRole: "ADMIN",
+    errorContext: "invitation",
   },
   async ({ user }) => {
     const invs = await prisma.invitation.findMany({
