@@ -61,9 +61,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        <div className="flex min-h-screen">
+        <div className="flex h-screen overflow-hidden">
           <Sidebar showAdminLink={showAdminLink} />
-          <main className="flex-1 overflow-x-hidden">
+          <main className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-6xl px-8 py-10">{children}</div>
           </main>
         </div>

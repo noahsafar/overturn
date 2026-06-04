@@ -34,10 +34,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="-mx-8 -my-10 flex min-h-screen">
+    <div className="-mx-8 -my-10 flex h-screen overflow-hidden">
       <AdminSidebar email={user.email} />
-      <div className="flex-1 overflow-x-hidden bg-gray-50">
-        <header className="border-b border-gray-200 bg-gray-900 px-8 py-3 text-sm text-gray-300">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <header className="border-b border-gray-200 bg-gray-900 px-8 py-3 text-sm text-gray-300 sticky top-0 z-10">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
             <span className="inline-flex items-center gap-2">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" />

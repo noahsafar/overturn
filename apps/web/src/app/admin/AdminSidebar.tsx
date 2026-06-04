@@ -21,8 +21,8 @@ const nav = [
 export function AdminSidebar({ email }: { email: string }) {
   const pathname = usePathname();
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-gray-800 bg-gray-950 text-gray-200">
-      <div className="flex h-16 items-center px-5 border-b border-gray-800">
+    <aside className="hidden md:flex w-60 shrink-0 flex-col h-screen overflow-y-auto border-r border-gray-800 bg-gray-950 text-gray-200 sticky top-0">
+      <div className="flex h-16 items-center px-5 border-b border-gray-800 shrink-0">
         <Link href="/admin" className="text-base font-semibold tracking-tight text-white">
           Overturn / ops
         </Link>
@@ -52,7 +52,7 @@ export function AdminSidebar({ email }: { email: string }) {
         })}
       </nav>
 
-      <div className="border-t border-gray-800 p-3 space-y-2">
+      <div className="border-t border-gray-800 p-3 space-y-2 shrink-0">
         <Link
           href="/"
           className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-900"

@@ -32,8 +32,8 @@ export function Sidebar({ showAdminLink = false }: { showAdminLink?: boolean }) 
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-16 items-center px-5 border-b border-gray-200">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col h-screen overflow-y-auto border-r border-gray-200 bg-white sticky top-0">
+      <div className="flex h-16 items-center px-5 border-b border-gray-200 shrink-0">
         <img src="/overturn-logo.svg?v=8" alt="Overturn" className="h-8 w-auto" />
       </div>
 
@@ -78,7 +78,7 @@ export function Sidebar({ showAdminLink = false }: { showAdminLink?: boolean }) 
         </div>
       )}
 
-      <div className="border-t border-gray-200 p-3">
+      <div className="border-t border-gray-200 p-3 shrink-0">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-400" />
           <div className="min-w-0">
