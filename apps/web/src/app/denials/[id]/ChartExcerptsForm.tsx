@@ -16,8 +16,93 @@ export function ChartExcerptsForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [text, setText] = useState(initialText);
+
+  // Analyze clinical context quality
+  const getContextQuality = (context: string) => {
+    const minLength = 200;
+    const hasMeasurements = /\d+°|\d+\/\d+|\d+\s*%/i.test(context);
+    const hasDates = /\d{1,2}\/\d{1,2}\/\d{4}|[A-Za-z]+ \d{1,2}, \d{4}/i.test(context);
+    const hasProgress = /progress|improv|better|worsen|baseline/i.test(context);
+    const hasTreatment = /treatment|therapy|exercise|mobilization|intervention/i.test(context);
+
+    if (context.length === 0) {
+      return { status: 'empty', message: 'No clinical context' };
+    }
+
+    if (context.length < minLength) {
+      return {
+        status: 'insufficient',
+        message: `Add more details (${context.length}/${minLength} min characters)`
+      };
+    }
+
+    const indicators = [];
+    if (!hasMeasurements) indicators.push('measurements');
+    if (!hasDates) indicators.push('dates');
+    if (!hasProgress) indicators.push('progress notes');
+    if (!hasTreatment) indicators.push('treatment details');
+
+    if (indicators.length === 0) {
+      return { status: 'good', message: 'Strong clinical context' };
+    }
+
+    if (indicators.length <= 2) {
+      return {
+        status: 'warning',
+        message: `Consider adding: ${indicators.join(', ')}`
+      };
+    }
+
+    return {
+      status: 'weak',
+      message: `Missing key elements: ${indicators.join(', ')}`
+    };
+  };
+
+  const contextQuality = getContextQuality(text);
+
+  const getQualityIndicator = () => {
+    switch (contextQuality.status) {
+      case 'empty':
+        return (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+            {contextQuality.message}
+          </div>
+        );
+      case 'insufficient':
+        return (
+          <div className="flex items-center gap-2 text-xs text-orange-600">
+            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+            {contextQuality.message}
+          </div>
+        );
+      case 'weak':
+        return (
+          <div className="flex items-center gap-2 text-xs text-red-600">
+            <span className="w-2 h-2 rounded-full bg-red-400"></span>
+            {contextQuality.message}
+          </div>
+        );
+      case 'warning':
+        return (
+          <div className="flex items-center gap-2 text-xs text-yellow-600">
+            <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+            {contextQuality.message}
+          </div>
+        );
+      case 'good':
+        return (
+          <div className="flex items-center gap-2 text-xs text-green-600">
+            <span className="w-2 h-2 rounded-full bg-green-400"></span>
+            {contextQuality.message}
+          </div>
+        );
+    }
+  };
 
   const handleSave = () => {
     setErr(null);
@@ -33,6 +118,7 @@ export function ChartExcerptsForm({
         return;
       }
       setSaved(true);
+      setLastSavedAt(new Date());
       router.refresh();
     });
   };
@@ -77,7 +163,12 @@ export function ChartExcerptsForm({
         onContextChange={handleContextChange}
       />
 
-      <div className="mt-6 border-t border-gray-200 pt-4">
+      {/* Context Quality Indicator */}
+      <div className="flex items-center justify-between mb-4">
+        {getQualityIndicator()}
+      </div>
+
+      <div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -95,6 +186,11 @@ export function ChartExcerptsForm({
             )}
             {err && <span className="text-sm text-error-700">{err}</span>}
           </div>
+          {lastSavedAt && (
+            <div className="text-xs text-gray-500">
+              Last saved: {lastSavedAt.toLocaleTimeString()} on {lastSavedAt.toLocaleDateString()}
+            </div>
+          )}
         </div>
       </div>
     </div>

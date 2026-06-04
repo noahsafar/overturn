@@ -138,7 +138,7 @@ export default async function DenialDetailPage({
               retrieved payer policies, and queue it for your review.
             </p>
             <div className="mt-4">
-              <StartAppealButton denialId={denial.id} />
+              <StartAppealButton denialId={denial.id} clinicalContext={denial.chartExcerptsText || ""} />
             </div>
           </div>
         ) : (
@@ -164,7 +164,7 @@ export default async function DenialDetailPage({
               ))}
             </ul>
             <div className="mt-4">
-              <StartAppealButton denialId={denial.id} label="Create another appeal" />
+              <StartAppealButton denialId={denial.id} label="Create another appeal" clinicalContext={denial.chartExcerptsText || ""} />
             </div>
           </div>
         )}
