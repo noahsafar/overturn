@@ -56,4 +56,18 @@ export const worker = {
       }>;
     }>("/internal/ingest-outcomes", { era });
   },
+
+  extractClinicalContext(documentBase64: string, filename: string) {
+    return call<{
+      context: string;
+      confidence: number;
+      sections: Array<{
+        title: string;
+        content: string;
+      }>;
+    }>("/internal/extract-clinical-context", {
+      document: documentBase64,
+      filename,
+    });
+  },
 };
