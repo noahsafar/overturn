@@ -1,0 +1,114 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  deploy-web:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push web image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f infra/docker/Dockerfile.web -t $ECR_REGISTRY/overturn-web:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/overturn-web:$IMAGE_TAG $ECR_REGISTRY/overturn-web:staging
+          docker push $ECR_REGISTRY/overturn-web:$IMAGE_TAG
+          docker push $ECR_REGISTRY/overturn-web:staging
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster overturn-staging --service web --force-new-deployment
+
+  deploy-worker:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push worker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f infra/docker/Dockerfile.worker -t $ECR_REGISTRY/overturn-worker:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/overturn-worker:$IMAGE_TAG $ECR_REGISTRY/overturn-worker:staging
+          docker push $ECR_REGISTRY/overturn-worker:$IMAGE_TAG
+          docker push $ECR_REGISTRY/overturn-worker:staging
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster overturn-staging --service worker --force-new-deployment
+
+  run-migrations:
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: [deploy-web, deploy-worker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Run database migrations
+        run: |
+          # Get RDS endpoint from ECS task or Secrets Manager
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier overturn-staging --query "DBInstances[0].Endpoint.Address" --output text)
+          PHI_ENC_KEY=$(aws secrets-manager get-secret-value --secret-id overturn/staging/phi_enc_key --query "SecretString" --output text)
+
+          export DATABASE_URL="postgresql://overturn:${{ secrets.DATABASE_PASSWORD }}@${RDS_ENDPOINT}:5432/overturn"
+          export PHI_ENC_KEY=$PHI_ENC_KEY
+
+          pnpm install
+          pnpm --filter @overturn/db deploy
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: [run-migrations]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        run: |
+          # Get staging URL from CloudFront or load balancer
+          STAGING_URL="https://staging.overturn.com"
+
+          # Basic health checks
+          curl -f $STAGING_URL/api/health || exit 1
+          curl -f $STAGING_URL/ || exit 1
+
+          # Run e2e smoke test
+          pnpm e2e

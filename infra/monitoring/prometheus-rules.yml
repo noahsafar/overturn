@@ -1,0 +1,195 @@
+# Prometheus Alerting Rules for Overturn
+# Configure these in Prometheus or Alertmanager
+
+groups:
+  # Critical alerts - page immediately
+  - name: overturn_critical
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{job=~"overturn-.*",status=~"5.."}[5m])
+          / rate(http_requests_total{job=~"overturn-.*"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }} (threshold: 5%)"
+          runbook_url: "https://docs.overturn.com/runbooks#high-error-rate"
+
+      - alert: ServiceDown
+        expr: up{job=~"overturn-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute"
+          runbook_url: "https://docs.overturn.com/runbooks#service-down"
+
+      - alert: DatabaseConnectionsExhausted
+        expr: |
+          pg_stat_database_numbackends{datname="overturn"}
+          / pg_settings_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of database connections are in use"
+          runbook_url: "https://docs.overturn.com/runbooks#database-connections"
+
+      - alert: WorkflowQueueBackedUp
+        expr: temporal_workflow_queue_depth > 100
+        for: 10m
+        labels:
+          severity: critical
+          service: temporal
+        annotations:
+          summary: "Temporal workflow queue depth is high"
+          description: "{{ $value }} workflows are pending in the queue"
+          runbook_url: "https://docs.overturn.com/runbooks#stuck-workflows"
+
+      - alert: AuditLogWriteFailures
+        expr: rate(audit_log_write_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Audit log write failures detected"
+          description: "Audit events are failing to write to the database"
+          runbook_url: "https://docs.overturn.com/runbooks#audit-log-failures"
+
+      - alert: PHIEncryptionFailure
+        expr: rate(phi_encryption_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: crypto
+        annotations:
+          summary: "PHI encryption failures detected"
+          description: "PHI encryption operations are failing"
+          runbook_url: "https://docs.overturn.com/runbooks#encryption-failures"
+
+  # Warning alerts - page within 15 minutes
+  - name: overturn_warning
+    interval: 1m
+    rules:
+      - alert: ElevatedErrorRate
+        expr: |
+          rate(http_requests_total{job=~"overturn-.*",status=~"5.."}[5m])
+          / rate(http_requests_total{job=~"overturn-.*"}[5m]) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Elevated error rate on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }} (threshold: 1%)"
+
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~"overturn-.*"}[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Slow response times on {{ $labels.job }}"
+          description: "P95 response time is {{ $value }}s (threshold: 5s)"
+
+      - alert: DatabaseConnectionPoolUsage
+        expr: |
+          pg_stat_database_numbackends{datname="overturn"}
+          / pg_settings_max_connections > 0.7
+        for: 15m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection pool usage"
+          description: "{{ $value | humanizePercentage }} of database connections are in use"
+
+      - alert: TemporalWorkerNotProcessing
+        expr: |
+          rate(temporal_workflow_executions_total[5m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: temporal
+        annotations:
+          summary: "Temporal worker not processing workflows"
+          description: "No workflow executions in the last 15 minutes"
+
+      - alert: SubmissionFailureRateHigh
+        expr: |
+          rate(submission_failure_total[10m])
+          / (rate(submission_success_total[10m]) + rate(submission_failure_total[10m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "High submission failure rate"
+          description: "Submission failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          runbook_url: "https://docs.overturn.com/runbooks#failed-submissions"
+
+      - alert: LLMParseErrors
+        expr: rate(llm_parse_errors_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: llm
+        annotations:
+          summary: "High LLM parse error rate"
+          description: "LLM responses are failing to parse at {{ $value | humanizePercentage }} rate"
+
+      - alert: BrowserAutomationFailures
+        expr: |
+          rate(browser_automation_failures_total[10m])
+          / rate(browser_automation_attempts_total[10m]) > 0.15
+        for: 15m
+        labels:
+          severity: warning
+          service: browser
+        annotations:
+          summary: "High browser automation failure rate"
+          description: "Browser automation failing at {{ $value | humanizePercentage }} rate"
+          runbook_url: "https://docs.overturn.com/runbooks#browser-automation-issues"
+
+  # Info alerts - daily digest
+  - name: overturn_info
+    interval: 5m
+    rules:
+      - alert: DeploymentDetected
+        expr: |
+          count_over_time(overturn_deployment{version!=""}[1h]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "New deployment detected"
+          description: "Version {{ $labels.version }} deployed to {{ $labels.environment }}"
+
+      - alert: DatabaseMigrationCompleted
+        expr: increase(database_migrations_completed_total[1h]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "Database migration completed"
+          description: "{{ $value }} migrations completed in the last hour"
+
+      - alert: HighVolumePeriod
+        expr: |
+          rate(http_requests_total{job=~"overturn-.*"}[5m])
+          > avg(rate(http_requests_total{job=~"overturn-.*"}[1h])) * 2
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Unusual traffic volume detected"
+          description: "Request rate is 2x higher than the hourly average"

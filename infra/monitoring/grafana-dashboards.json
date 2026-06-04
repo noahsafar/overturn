@@ -1,0 +1,341 @@
+{
+  "dashboards": [
+    {
+      "name": "overturn-main-dashboard",
+      "title": "Overturn Main Dashboard",
+      "description": "Primary monitoring dashboard for Overturn services",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{job=~\"overturn-.*\"}[5m])",
+              "legendFormat": "{{job}} - {{method}} {{status}}"
+            }
+          ],
+          "description": "HTTP requests per second by service"
+        },
+        {
+          "id": 2,
+          "title": "Error Rate",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total{job=~\"overturn-.*\",status=~\"5..\"}[5m]) / rate(http_requests_total{job=~\"overturn-.*\"}[5m])",
+              "legendFormat": "{{job}}"
+            }
+          ],
+          "alert": {
+            "conditions": [
+              {
+                "evaluator": {
+                  "params": [0.05],
+                  "type": "gt"
+                },
+                "operator": {
+                  "type": "and"
+                },
+                "query": {
+                  "params": ["A", "5m", "now"]
+                },
+                "reducer": {
+                  "params": [],
+                  "type": "avg"
+                },
+                "type": "query"
+              }
+            ],
+            "executionErrorState": "alerting",
+            "frequency": "1m",
+            "handler": 1,
+            "name": "HighErrorRate",
+            "noDataState": "no_data",
+            "notifications": []
+          }
+        },
+        {
+          "id": 3,
+          "title": "Response Time (p95)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"overturn-.*\"}[5m]))",
+              "legendFormat": "{{job}}"
+            }
+          ],
+          "description": "95th percentile response time in seconds"
+        },
+        {
+          "id": 4,
+          "title": "Database Connections",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "pg_stat_database_numbackends{datname=\"overturn\"}",
+              "legendFormat": "Active Connections"
+            }
+          ],
+          "max": 100,
+          "min": 0
+        },
+        {
+          "id": 5,
+          "title": "Temporal Workflow Queue Depth",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "temporal_workflow_queue_depth",
+              "legendFormat": "Pending Workflows"
+            }
+          ],
+          "max": 1000,
+          "min": 0
+        },
+        {
+          "id": 6,
+          "title": "Appeals Submitted (Hourly)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(appeals_submitted_total[1h]) * 3600",
+              "legendFormat": "Appeals/Hour"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Submission Success Rate",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "rate(submission_success_total[5m]) / (rate(submission_success_total[5m]) + rate(submission_failure_total[5m]))",
+              "legendFormat": "Success Rate"
+            }
+          ],
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        {
+          "id": 8,
+          "title": "LLM Token Usage",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(llm_tokens_total[5m])",
+              "legendFormat": "Tokens/Second"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "LLM Costs (Hourly)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(llm_cost_dollars_total[1h]) * 3600",
+              "legendFormat": "Cost/Hour ($)"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "ECS Task CPU Utilization",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "aws_ecs_task_cpu_utilization{service_name=~\"overturn-.*\"}",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "ECS Task Memory Utilization",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "aws_ecs_task_memory_utilization{service_name=~\"overturn-.*\"}",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "overturn-business-metrics",
+      "title": "Overturn Business Metrics",
+      "description": "Business KPIs and operational metrics",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Appeals Won Today",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(appeals_won_total[24h])",
+              "legendFormat": "Appeals Won"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Appeals Won This Week",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(appeals_won_total[7d])",
+              "legendFormat": "Appeals Won"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Appeals Won This Month",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(appeals_won_total[30d])",
+              "legendFormat": "Appeals Won"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Win Rate (7-day rolling)",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "increase(appeals_won_total[7d]) / increase(appeals_resolved_total[7d])",
+              "legendFormat": "Win Rate"
+            }
+          ],
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        {
+          "id": 5,
+          "title": "Time to Submission (p50)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(appeal_submission_duration_seconds_bucket[5m]))",
+              "legendFormat": "Median Time"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Recovered Revenue (7-day)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(recovered_amount_dollars_total[7d])",
+              "legendFormat": "Revenue ($)"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Active Practices",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "active_practices_total",
+              "legendFormat": "Practices"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Submission Failures by Payer",
+          "type": "piechart",
+          "targets": [
+            {
+              "expr": "increase(submission_failure_total{payer_name!=\"\"}[24h])",
+              "legendFormat": "{{payer_name}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "overturn-security-dashboard",
+      "title": "Overturn Security Dashboard",
+      "description": "Security and compliance monitoring",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Failed Auth Attempts",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(auth_failures_total[5m])",
+              "legendFormat": "Failed Logins/Second"
+            }
+          ],
+          "alert": {
+            "conditions": [
+              {
+                "evaluator": {"params": [10], "type": "gt"},
+                "operator": {"type": "and"},
+                "query": {"params": ["A", "5m", "now"], "type": "query"},
+                "reducer": {"params": [], "type": "sum"},
+                "type": "query"
+              }
+            ],
+            "name": "BruteForceAttack"
+          }
+        },
+        {
+          "id": 2,
+          "title": "PHI Access Events",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(phi_access_events_total[5m])",
+              "legendFormat": "PHI Access/Second"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Rate Limit Violations",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(rate_limit_violations_total[5m])",
+              "legendFormat": "Violations/Second"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Audit Log Write Failures",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(audit_log_write_failures_total[5m])",
+              "legendFormat": "Failures/Second"
+            }
+          ],
+          "alert": {
+            "conditions": [
+              {
+                "evaluator": {"params": [0], "type": "gt"},
+                "operator": {"type": "and"},
+                "query": {"params": ["A", "5m", "now"], "type": "query"},
+                "reducer": {"params": [], "type": "sum"},
+                "type": "query"
+              }
+            ],
+            "name": "AuditLogFailure"
+          }
+        }
+      ]
+    }
+  ]
+}

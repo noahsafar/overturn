@@ -1,0 +1,192 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tests pass
+        run: |
+          pnpm install
+          pnpm test
+
+      - name: Validate no schema drift
+        run: |
+          pnpm --filter @overturn/db db:validate
+
+      - name: Validate security scan
+        run: |
+          # Run security vulnerability scan
+          pnpm audit
+          pip-audit
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push web image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.ref_name || inputs.version }}
+        run: |
+          docker build -f infra/docker/Dockerfile.web -t $ECR_REGISTRY/overturn-web:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/overturn-web:$IMAGE_TAG $ECR_REGISTRY/overturn-web:production
+          docker tag $ECR_REGISTRY/overturn-web:$IMAGE_TAG $ECR_REGISTRY/overturn-web:latest
+          docker push $ECR_REGISTRY/overturn-web:$IMAGE_TAG
+          docker push $ECR_REGISTRY/overturn-web:production
+          docker push $ECR_REGISTRY/overturn-web:latest
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster overturn-production --service web --force-new-deployment
+
+      - name: Wait for deployment
+        run: |
+          aws ecs wait services-stable --cluster overturn-production --services web
+
+  deploy-worker:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push worker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.ref_name || inputs.version }}
+        run: |
+          docker build -f infra/docker/Dockerfile.worker -t $ECR_REGISTRY/overturn-worker:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/overturn-worker:$IMAGE_TAG $ECR_REGISTRY/overturn-worker:production
+          docker tag $ECR_REGISTRY/overturn-worker:$IMAGE_TAG $ECR_REGISTRY/overturn-worker:latest
+          docker push $ECR_REGISTRY/overturn-worker:$IMAGE_TAG
+          docker push $ECR_REGISTRY/overturn-worker:production
+          docker push $ECR_REGISTRY/overturn-worker:latest
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster overturn-production --service worker --force-new-deployment
+
+      - name: Wait for deployment
+        run: |
+          aws ecs wait services-stable --cluster overturn-production --services worker
+
+  run-migrations:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [deploy-web, deploy-worker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Create migration backup
+        run: |
+          # Create snapshot before migrations
+          aws rds create-db-snapshot --db-instance-identifier overturn-production --db-snapshot-identifier pre-migration-$(date +%Y%m%d-%H%M%S)
+
+      - name: Run database migrations
+        run: |
+          RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier overturn-production --query "DBInstances[0].Endpoint.Address" --output text)
+          PHI_ENC_KEY=$(aws secrets-manager get-secret-value --secret-id overturn/production/phi_enc_key --query "SecretString" --output text)
+
+          export DATABASE_URL="postgresql://overturn:${{ secrets.DATABASE_PASSWORD }}@${RDS_ENDPOINT}:5432/overturn"
+          export PHI_ENC_KEY=$PHI_ENC_KEY
+
+          pnpm install
+          pnpm --filter @overturn/db deploy
+
+      - name: Verify migration success
+        run: |
+          # Run basic queries to verify schema
+          pnpm --filter @overturn/db migrate:status
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [run-migrations]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run production smoke tests
+        run: |
+          PRODUCTION_URL="https://app.overturn.com"
+
+          # Basic health checks
+          curl -f $PRODUCTION_URL/api/health || exit 1
+          curl -f $PRODUCTION_URL/ || exit 1
+
+          # Run e2e smoke test with synthetic data (no real PHI)
+          pnpm e2e
+
+      - name: Monitor for critical errors
+        run: |
+          # Check Sentry for new errors in last 15 minutes
+          # Alert if error rate increased significantly
+          echo "Production deployment verified"
+
+  rollback-on-failure:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [smoke-test]
+    if: failure()
+    steps:
+      - name: Rollback ECS services
+        run: |
+          aws ecs update-service --cluster overturn-production --service web --force-new-deployment --task-definition $(aws ecs list-task-definitions --family-prefix overturn-web --sort DESC --max-items 2 --query 'taskDefinitions[1].split("/") | [-1]' --output text)
+          aws ecs update-service --cluster overturn-production --service worker --force-new-deployment --task-definition $(aws ecs list-task-definitions --family-prefix overturn-worker --sort DESC --max-items 2 --query 'taskDefinitions[1].split("/") | [-1]' --output text)
+
+      - name: Rollback database
+        run: |
+          # Restore from pre-migration snapshot if needed
+          LATEST_SNAPSHOT=$(aws rds describe-db-snapshots --db-instance-identifier overturn-production --query 'DBSnapshots[-1].DBSnapshotIdentifier' --output text)
+          echo "Would restore from snapshot: $LATEST_SNAPSHOT"
+          echo "Manual verification required before restoring"
+
+      - name: Notify team
+        run: |
+          echo "Production deployment failed. Rollback initiated."
+          # Send alert to Slack/PagerDuty

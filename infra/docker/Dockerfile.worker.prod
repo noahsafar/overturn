@@ -1,0 +1,60 @@
+# Production Dockerfile for Worker
+# Multi-stage build for smaller image size and better security
+
+FROM python:3.12-slim-bookworm AS base
+WORKDIR /app
+
+# Install build dependencies and clean up in same layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install uv for faster dependency management
+RUN pip install --no-cache-dir uv
+
+# Install Python dependencies
+COPY apps/worker/pyproject.toml ./apps/worker/
+COPY packages/prompts ./packages/prompts
+
+# Create virtual environment and install dependencies
+RUN cd apps/worker && uv venv && uv pip install --system -e ".[dev,era]"
+
+# Production runtime stage
+FROM python:3.12-slim-bookworm AS runtime
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install uv and recreate virtual environment
+RUN pip install --no-cache-dir uv
+
+# Install non-root user for security
+RUN groupadd --gid 1001 --system worker && \
+    useradd --uid 1001 --system --gid worker worker
+
+# Copy virtual environment and application code
+COPY --from=base /app/.venv /app/.venv
+COPY --from=base --chown=worker:worker /app/apps /app/apps
+COPY --from=base --chown=worker:worker /app/packages /app/packages
+
+# Ensure venv is in PATH
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app/apps/worker/src
+
+# Switch to non-root user
+USER worker
+
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["python", "-m", "overturn_worker.dev"]
