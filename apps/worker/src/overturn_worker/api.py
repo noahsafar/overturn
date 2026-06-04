@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from temporalio.client import Client
 
+from . import init  # Validate environment on startup
 from .activities import llm_edit_appeal
 from .config import SETTINGS
 from .workflows import AppealDraftWorkflow, AppealSubmitWorkflow
@@ -48,6 +49,11 @@ class EraParseReq(BaseModel):
 
 class IngestOutcomesReq(BaseModel):
     era: str
+
+
+class ClinicalContextExtractionReq(BaseModel):
+    document: str  # base64 encoded PDF
+    filename: str
 
 
 class BackfillEmbeddingsReq(BaseModel):
@@ -185,4 +191,24 @@ async def backfill_embeddings_endpoint(req: BackfillEmbeddingsReq) -> dict:
         return {"updated": updated}
     except Exception as e:
         logger.exception(f"embedding backfill failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
+@app.post("/internal/extract-clinical-context")
+async def extract_clinical_context(req: ClinicalContextExtractionReq) -> dict:
+    """Extract clinical context from uploaded medical documents (PDF).
+
+    Uses AI to identify relevant clinical information for appeal drafting.
+    """
+    try:
+        from .clinical_context import extract_clinical_context_from_pdf
+
+        result = extract_clinical_context_from_pdf(req.document, req.filename)
+        return {
+            "context": result.context,
+            "confidence": result.confidence,
+            "sections": result.sections
+        }
+    except Exception as e:
+        logger.exception(f"clinical context extraction failed: {e}")
         raise HTTPException(500, str(e)) from e

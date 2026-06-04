@@ -9,6 +9,8 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from . import activities
+# Temporarily disabled during build debugging
+# from . import init  # Validate environment on startup
 from .config import SETTINGS
 from .workflows import AppealDraftWorkflow, AppealSubmitWorkflow, FollowUpCheckWorkflow
 
