@@ -19,6 +19,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -161,14 +162,17 @@ def run_ingest_once() -> IngestStats:
     total.outcomes_recorded += dev_stats.outcomes_recorded
     total.errors += dev_stats.errors
 
-    # SFTP per practice
+    # SFTP per practice (enabled + configured)
     with SessionLocal() as s:
         practices = s.execute(
             select(Practice).where(
+                Practice.clearinghouseEnabled.is_(True),
                 Practice.clearinghouseSftpHost.is_not(None),
             )
         ).scalars().all()
     for p in practices:
+        now = datetime.now(timezone.utc)
+        err: str | None = None
         try:
             ps = _ingest_sftp_for_practice(p)
             total.files_seen += ps.files_seen
@@ -177,7 +181,19 @@ def run_ingest_once() -> IngestStats:
             total.errors += ps.errors
         except Exception as e:
             logger.exception("sftp loop failed for practice %s: %s", p.id, e)
+            err = str(e)[:500]
             total.errors += 1
+        # Record polling status for the UI to surface
+        with SessionLocal() as s2:
+            row = s2.get(Practice, p.id)
+            if row is not None:
+                row.clearinghouseLastPolledAt = now
+                if err is None:
+                    row.clearinghouseLastSuccessAt = now
+                    row.clearinghouseLastError = None
+                else:
+                    row.clearinghouseLastError = err
+                s2.commit()
 
     return total
 

@@ -1,0 +1,39 @@
+PLAINS COMMUNITY HEALTH
+Established Patient Visit
+
+Patient: Allen, Keisha
+DOB: 1989-12-14          MRN: PCH-2024-3309
+Date of Service: 08/30/2024
+Rendering Provider: Talia Verma, MD
+Encounter Type: Established patient visit (CPT 99213)
+Claim Control Number: MOL-DUP-9991
+
+CHIEF COMPLAINT
+Sinus pressure and congestion, 8 days.
+
+HPI
+35-year-old female with 8 days of bilateral maxillary pressure,
+yellow-green nasal discharge, and worsening fatigue. No dental
+pain. Afebrile.
+
+EXAM / VITALS
+T 98.6   HR 72   BP 122/78
+ENT: Right maxillary tenderness; nasal mucosa erythematous with
+purulent discharge.
+
+ASSESSMENT/PLAN
+1. Acute bacterial sinusitis (J32.0) — duration > 7 days plus
+   purulence and unilateral tenderness. Augmentin 875/125 BID x 7 d.
+2. Symptomatic management: saline irrigation, NSAIDs prn.
+RTC 10 days if not resolving.
+
+E/M LEVEL: 99213 — established patient, low-complexity MDM.
+
+BILLING NOTE (re: CO-18 duplicate denial):
+Encounter on 08/30/2024 is a SEPARATE office visit, distinct from the
+prior 06/04/2024 sinusitis visit (claim 88112). Different episode of
+care, > 90 days apart, different antibiotic course. Per Molina policy
+PR-12 §4, repeat sinusitis episodes more than 30 days apart are not
+considered duplicate services. Requesting reconsideration.
+
+Signed: Verma, T. MD — 08/30/2024 10:46

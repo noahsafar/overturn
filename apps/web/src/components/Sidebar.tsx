@@ -13,22 +13,25 @@ import {
   ShieldCheckIcon,
   UsersIcon,
   ChartPieIcon,
-  CommandLineIcon,
+  PresentationChartLineIcon,
+  CloudArrowDownIcon,
 } from "@heroicons/react/24/outline";
 
 const nav = [
   { name: "Home", href: "/", icon: HomeIcon },
   { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
   { name: "Denials", href: "/denials", icon: DocumentTextIcon },
+  { name: "Analytics", href: "/analytics", icon: PresentationChartLineIcon },
   { name: "Upload", href: "/upload", icon: ArrowUpTrayIcon },
   { name: "Invoices", href: "/invoices", icon: BanknotesIcon },
   { name: "Reports", href: "/reports", icon: ChartPieIcon },
   { name: "Payers", href: "/settings/payers", icon: BuildingOffice2Icon },
+  { name: "Clearinghouse", href: "/settings/clearinghouse", icon: CloudArrowDownIcon },
   { name: "Members", href: "/settings/members", icon: UsersIcon },
   { name: "Audit log", href: "/settings/audit", icon: ShieldCheckIcon },
 ];
 
-export function Sidebar({ showAdminLink = false }: { showAdminLink?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
 
   return (
@@ -63,27 +66,14 @@ export function Sidebar({ showAdminLink = false }: { showAdminLink?: boolean }) 
         })}
       </nav>
 
-      {showAdminLink && (
-        <div className="border-t border-gray-200 p-3">
-          <Link
-            href="/admin"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            <CommandLineIcon className="h-5 w-5 text-gray-400" />
-            <span>Ops console</span>
-            <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-400">
-              admin
-            </span>
-          </Link>
-        </div>
-      )}
-
       <div className="border-t border-gray-200 p-3 shrink-0">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-gray-300 to-gray-400" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-gray-900">Dev User</p>
-            <p className="text-xs text-gray-500">Synthetic data</p>
+            <p className="truncate text-sm font-medium text-gray-900">
+              Lakeside Behavioral Health
+            </p>
+            <p className="text-xs text-gray-500">Demo clinic</p>
           </div>
         </div>
       </div>

@@ -1,0 +1,17 @@
+PATIENT: John Smith
+MEMBER ID: MBR12345
+PATIENT ID: PT001
+
+SERVICE DATE: May 1, 2024
+CLAIM CONTROL NUMBER: CLM123456
+
+DENIAL INFORMATION:
+Denial Code: CO-50
+Denial Reason: Medical necessity not established
+Denied Amount: $150.00
+
+This service was denied because medical necessity has not been established.
+The documentation provided does not support the medical necessity of this service.
+
+APPEAL DEADLINE: 90 days from date of denial
+PAYER: Aetna

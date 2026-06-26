@@ -1,0 +1,3 @@
+Account#,MRN,Patient Last,Patient First,Patient DOB,Subscriber#,Payer Name,Plan Type,Date of Service,CPT Code,Modifier,ICD-10,Billed,Allowed,Paid,Adjustment Reason Code,Adjustment Reason,Patient Resp,Provider,Place of Svc,Rendering NPI,Received
+ACC-800001,MRN-90001,DUFFY,MARCUS,1958-08-19,UHC2233445566,United Healthcare,PPO,2024-10-01,99214,25,E11.9,215.00,128.34,86.32,CO-45,Charge exceeds fee schedule,42.02,Dr. Park,11,1234567890,2024-10-15,86.32
+ACC-800002,MRN-90002,VASQUEZ,GABRIELA,1992-03-04,UHC3344556677,United Healthcare,PPO,2024-10-02,11102,,D23.5,165.00,0.00,0.00,CO-197,Authorization absent,0.00,Dr. Lewis,11,1234567890,2024-10-16,0.00

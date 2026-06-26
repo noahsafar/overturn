@@ -1,0 +1,56 @@
+WESTBROOK DERMATOLOGY
+Procedure Note
+
+Patient: Hayes, Olivia
+DOB: 2008-03-22 (age 16) MRN: WD-2024-9912
+Subscriber/Guarantor: Matthew Hayes (father)
+Date of Service: 05/15/2024
+Rendering Provider: Priya Iyer, MD (Dermatology, NPI 1098877664)
+Procedure: Tangential biopsy of single lesion (CPT 11102)
+
+CHIEF COMPLAINT
+Changing pigmented lesion, right shoulder.
+
+HPI
+16-year-old female presents with mother for evaluation of a pigmented
+lesion on the right upper shoulder, first noticed by mother approximately
+4 months ago, with reported increase in size and slight color variability.
+Patient denies pruritus or bleeding. Family history significant for
+melanoma (paternal grandfather, age 64). Patient has Fitzpatrick II skin.
+
+EXAMINATION
+Focused skin exam of head/neck/upper trunk. Lesion of interest:
+right superior trapezius region, 7 mm x 5 mm asymmetric pigmented
+macule, irregular border, two shades of brown with central darkening.
+Dermoscopy: atypical network with focal disorganization.
+ABCDE: positive for asymmetry, border irregularity, color variation,
+diameter > 6 mm. No palpable axillary lymphadenopathy.
+
+CONSENT
+Risks/benefits/alternatives discussed with patient and mother
+(legal guardian present). Informed consent obtained for shave biopsy.
+
+PROCEDURE (CPT 11102 — tangential biopsy, single lesion)
+- Site marked. Skin prepped with chlorhexidine.
+- Local anesthesia: 1.0 mL lidocaine 1% with epinephrine.
+- Tangential (shave) biopsy performed using a #15 blade. Lesion
+  removed in toto to depth of mid-reticular dermis.
+- Hemostasis: aluminum chloride 35%.
+- Dressing applied. Specimen submitted to dermatopathology
+  (Westbrook Dermpath, accession #WD-DP-2024-04471) for histologic
+  evaluation. Differential includes dysplastic nevus vs early melanoma.
+- Patient tolerated procedure well. No complications.
+
+ASSESSMENT
+1. Pigmented lesion, right shoulder, clinically atypical (D48.5).
+2. Family history of melanoma (Z80.8).
+3. Pending pathology results.
+
+PLAN
+- Pathology pending; results in 5-7 business days.
+- Wound care instructions provided in writing.
+- Return for results review and further management.
+- Total body skin exam offered for surveillance given family history;
+  scheduled for 6 weeks (separate visit).
+
+Electronically signed: Iyer, Priya MD on 05/15/2024 13:51

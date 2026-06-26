@@ -1,0 +1,3 @@
+patient_id,first_name,last_name,dob,member_id,payer,service_date,cpt,billed_amount,denial_code,denial_reason,denied_amount
+            PT-9001,DASHIELL,GREGSON-PARK,1981-06-11,BC557788990,"Blue Cross Blue Shield of Massachusetts, Inc.",2024-11-01,99213,145.00,CO-45,"Allowed amount is based on contractual fee schedule, see EOB",58.42
+            PT-9002,SVETLANA,VOLKOV,1970-09-28,BC668899001,"Blue Cross Blue Shield of Massachusetts, Inc.",2024-11-03,99204,295.00,CO-50,"Medical necessity not established, additional documentation required",295.00

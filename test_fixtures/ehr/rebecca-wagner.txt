@@ -1,0 +1,50 @@
+CEDAR FAMILY PRACTICE
+Established Patient Visit
+
+Patient: Wagner, Rebecca
+DOB: 1967-11-29          MRN: CFP-0088776
+Date of Service: 02/15/2023
+Rendering Provider: Joseph Whitman, MD
+Encounter Type: Established patient, moderate complexity (CPT 99214)
+Plus: CPT 93000 — 12-lead ECG with interpretation
+Claim Control Number: UHC-2024041902
+
+CHIEF COMPLAINT
+Intermittent palpitations and lightheadedness x 3 weeks.
+
+HPI
+55-year-old female presents with recurrent episodes of "fluttering"
+sensation in the chest, lasting 1-3 minutes, occurring 2-3 times
+weekly. Two episodes associated with brief lightheadedness without
+syncope. No exertional component. Reports increased caffeine intake
+recently and significant work stress. No known cardiac history. No
+chest pain, dyspnea, orthopnea, or edema.
+
+EXAM / VITALS
+BP 138/86   HR 78 (regular)   SpO2 99% RA
+CV: RRR, no murmurs/rubs/gallops, normal S1/S2.
+Pulm: CTAB. No JVD. No peripheral edema.
+
+DIAGNOSTICS PERFORMED TODAY
+- 12-lead ECG (CPT 93000): normal sinus rhythm, rate 76, normal axis,
+  no ST/T abnormalities, QTc 412 ms. Interpreted by Whitman, MD.
+
+ASSESSMENT/PLAN
+1. Palpitations, unspecified (R00.2). ECG unremarkable today.
+2. Likely benign etiology given normal baseline ECG; rule out PSVT/PACs.
+   - Ordered 14-day Zio patch (separate claim).
+   - TSH, CBC, BMP today.
+3. Advised reduction in caffeine intake. Stress management discussed.
+
+E/M LEVEL: 99214 — established patient, moderate-complexity MDM
+(new problem with workup ordered, prescription drug consideration).
+
+RTC 2-3 weeks for monitor results.
+
+Signed: Whitman, J. MD — 02/15/2023 14:33
+
+BILLING NOTE (re: timely filing CO-29 denial):
+Both line items on this claim were on the same date of service.
+Original 837P submitted 02/17/2023. Resubmission 06/03/2023 corrected
+a payer-id mismatch identified by clearinghouse. Timely filing window
+should be measured from the original submission date.

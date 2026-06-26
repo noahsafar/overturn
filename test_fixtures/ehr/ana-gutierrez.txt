@@ -1,0 +1,48 @@
+PLAINS COMMUNITY HEALTH
+Established Patient Follow-up
+
+Patient: Gutierrez, Ana
+DOB: 1953-07-18          MRN: PCH-2018-1129
+Date of Service: 09/03/2024
+Rendering Provider: Ravi Anand, MD
+Encounter Type: Established patient follow-up
+Plus: Venipuncture (CPT 36415) + Comprehensive metabolic panel (CPT 80053)
+Claim Control Number: MOL-BUNDLE-9993
+
+CHIEF COMPLAINT
+3-month diabetes follow-up; routine labs ordered.
+
+HPI
+71-year-old female with longstanding type 2 diabetes mellitus.
+Reports adherence to metformin and empagliflozin. Home glucose log
+shows fasting 130-160. No hypoglycemic episodes. Reports occasional
+foot tingling — bilateral, intermittent. Denies polyuria, polydipsia,
+or recent weight change.
+
+EXAM / VITALS
+BP 138/82   HR 76   BMI 30.1
+Foot exam: intact monofilament 10/10 bilaterally; no ulcers; pulses
+2+. Otherwise unremarkable.
+
+DIAGNOSTICS PERFORMED TODAY
+- CPT 36415 — Venipuncture for blood collection. Performed at point
+  of care. Sample sent to outpatient lab.
+- CPT 80053 — Comprehensive metabolic panel ordered (results pending).
+- A1C, lipid panel, microalbumin/creatinine ratio ordered separately.
+
+ASSESSMENT/PLAN
+1. Type 2 diabetes mellitus with neuropathy (E11.40) — suspected
+   given paresthesias. Continue current regimen pending A1C.
+2. Stage 1 hypertension (I10) — controlled. Continue lisinopril 20 mg.
+RTC 3 months.
+
+E/M LEVEL: 99213 (separate component) — established patient, low MDM.
+
+BILLING NOTE (re: CO-97 bundled denial for 36415 + 80053):
+The 36415 venipuncture and 80053 CMP are distinct, non-overlapping
+services. Per Molina policy LAB-04 §2.3, in-office venipuncture for
+specimens not analyzed on-site is separately billable when performed
+in conjunction with comprehensive lab panels. Modifier 59 added on
+resubmission to denote distinct service.
+
+Signed: Anand, R. MD — 09/03/2024 09:22

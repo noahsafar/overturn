@@ -1,0 +1,52 @@
+HILL COUNTRY PEDIATRICS
+Established Patient Visit
+
+Patient: Nguyen, Mai
+DOB: 2017-09-30 (age 6)   MRN: HCP-998-877
+Date of Service: 02/28/2024
+Rendering Provider: Beatrice Holloway, MD (Pediatrics)
+Encounter Type: Established patient, moderate complexity (CPT 99214)
+
+CHIEF COMPLAINT
+Persistent cough x 12 days; mom reports worsening overnight wheezing.
+
+HPI
+6-year-old female brought in by mother with 12 days of nonproductive
+cough, now associated with nighttime wheeze and tactile fever to 100.4°F.
+Mother reports decreased oral intake, less playful than baseline,
+and one episode of post-tussive emesis last night. Prior diagnosis
+of intermittent asthma at age 4; uses albuterol PRN — has needed it
+every 4-6 hours for past 3 days. No known sick contacts. Up to date
+on immunizations.
+
+ROS
+Constitutional: subjective fever; ENT: rhinorrhea; Resp: cough,
+wheeze; GI: emesis x1 last night; Skin: no rash. Otherwise negative.
+
+EXAM
+Vitals: T 100.1°F   HR 122   RR 26   SpO2 95% RA
+Gen: Tired-appearing but consolable.
+HEENT: TMs clear bilaterally, oropharynx erythematous without exudate.
+Resp: Mild end-expiratory wheeze diffusely, mild subcostal retractions
+at rest, prolonged expiratory phase.
+CV: Tachycardia, no murmur.
+Abd: Soft, NT.
+
+ASSESSMENT/PLAN
+1. Acute asthma exacerbation (J45.901) — moderate severity.
+   - Albuterol nebulizer 2.5 mg in clinic, repeated x2. Reassessed
+     post-treatment: SpO2 98%, RR 22, retractions improved, wheeze
+     markedly reduced.
+   - Prescribed oral prednisolone 1 mg/kg/day x 5 days.
+   - Continue albuterol HFA 2 puffs q4h prn for 72 h, then taper.
+2. Viral URI (J06.9) — likely trigger. Supportive care.
+3. Anticipatory guidance: return precautions reviewed (work of breathing,
+   inability to speak in full sentences, persistent fever, dehydration).
+
+E/M LEVEL: 99214 — established patient, moderate-complexity MDM
+(acute illness with systemic symptoms, prescription drug management).
+
+Follow-up: 1 week (sooner prn). Asthma action plan updated and
+provided to caregiver.
+
+Electronically signed: Holloway, Beatrice MD on 02/28/2024 11:18

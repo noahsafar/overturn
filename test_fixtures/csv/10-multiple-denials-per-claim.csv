@@ -1,0 +1,5 @@
+patient_id,first_name,last_name,member_id,payer,service_date,cpt,billed_amount,denial_code,denial_reason,denied_amount,received_at
+PT-A001,MILES,DONOVAN,MOL778899001,Molina Healthcare,2024-12-01,99214,215.00,CO-45,Fee schedule,107.50,2024-12-15
+PT-A001,MILES,DONOVAN,MOL778899001,Molina Healthcare,2024-12-01,99214,215.00,PR-1,Deductible,75.00,2024-12-15
+PT-A001,MILES,DONOVAN,MOL778899001,Molina Healthcare,2024-12-01,99214,215.00,PR-2,Coinsurance,16.30,2024-12-15
+PT-A002,RHIANNON,HALL,MOL889900112,Molina Healthcare,2024-12-03,80053,70.00,CO-97,Bundled into E/M,70.00,2024-12-16

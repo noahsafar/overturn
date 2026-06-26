@@ -1,0 +1,41 @@
+PLAINS COMMUNITY HEALTH
+New Patient Visit
+
+Patient: Martinez, Javier
+DOB: 1976-02-03          MRN: PCH-2024-3417
+Date of Service: 09/01/2024
+Rendering Provider: Anand Joshi, MD
+Encounter Type: New patient visit, moderate MDM (CPT 99204)
+              Plus: 12-lead ECG with interpretation (CPT 93000)
+Claim Control Number: MOL-PROC-9992
+
+CHIEF COMPLAINT
+"Heart racing" on exertion, two weeks.
+
+HPI
+48-year-old male reports two-week history of palpitations on moderate
+exertion (climbing more than two flights of stairs) lasting 2-5 min.
+Denies syncope, chest pain, dyspnea at rest. New job started 6 weeks
+ago — significantly increased physical activity. Smokes occasional
+cigarettes (3-4/week). FH: father MI age 58.
+
+EXAM / VITALS
+BP 142/88   HR 92   BMI 31.2
+CV: regular at rest, no murmurs.
+Pulm: CTAB.
+
+DIAGNOSTICS PERFORMED TODAY
+- CPT 93000 — 12-lead ECG: sinus rhythm 92, no ischemic changes,
+  QTc 421 ms. Interpreted by Joshi, MD.
+
+ASSESSMENT/PLAN
+1. Palpitations with exertion (R00.2). Concerning history given FH.
+   - Ordered exercise stress test (separate referral).
+   - 14-day cardiac event monitor.
+2. Stage 2 hypertension (I10) — new diagnosis. Started lisinopril 10 mg.
+3. Tobacco use — counseled cessation.
+
+E/M LEVEL: 99204 — new patient, moderate-complexity MDM (new problem
+with workup ordered, two new prescriptions).
+
+Signed: Joshi, A. MD — 09/01/2024 11:33

@@ -70,4 +70,21 @@ export const worker = {
       filename,
     });
   },
+
+  submitCorrectedClaim(input: {
+    denialId: string;
+    correctedCpt?: string | null;
+    correctedModifier?: string | null;
+    reason: string;
+  }) {
+    return call<{
+      appeal_id: string;
+      submission_id: string;
+      success: boolean;
+      channel: "CLEARINGHOUSE_837";
+      confirmation_number: string;
+      artifact_path: string | null;
+      errorMessage: string | null;
+    }>("/internal/corrected-claim/submit", input);
+  },
 };

@@ -1,0 +1,4 @@
+CLP*CLAIM123*500*0*0*500*1*DENIAL
+CAS*CO-50*500*Medical necessity not established
+CLP*CLAIM456*300*100*0*200*1*DENIAL
+CAS*CO-45*200*Charge exceeds fee schedule

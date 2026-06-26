@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@overturn/db";
 import { Sidebar } from "@/components/Sidebar";
-import { currentUser, isSuperuser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Overturn",
@@ -39,7 +39,6 @@ function isAllowedForUnonboarded(pathname: string): boolean {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser().catch(() => null);
-  const showAdminLink = isSuperuser(user);
 
   // Onboarding gate — if a user is logged in but their practice hasn't
   // finished onboarding, push them to /onboarding (unless they're already
@@ -62,7 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
         <div className="flex h-screen overflow-hidden">
-          <Sidebar showAdminLink={showAdminLink} />
+          <Sidebar />
           <main className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-6xl px-8 py-10">{children}</div>
           </main>

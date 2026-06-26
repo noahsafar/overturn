@@ -1,0 +1,3 @@
+patient_id;first_name;last_name;dob;member_id;payer;service_date;cpt;icd;billed_amount;denial_code;denial_reason;denied_amount
+PT-5001;LEONARDO;BIANCHI;1980-05-12;ANT001122334;Anthem;2024-08-01;99213;Z00.00;145.00;PR-1;Deductible;145.00
+PT-5002;ISABELLE;ROUSSEAU;1956-11-29;ANT112233445;Anthem;2024-08-03;36415;R79.89;15.00;CO-97;Bundled;15.00

@@ -112,6 +112,10 @@ class Practice(Base):
     clearinghouseSftpHost: Mapped[str | None] = mapped_column(String, nullable=True)
     clearinghouseSftpUser: Mapped[str | None] = mapped_column(String, nullable=True)
     clearinghouseSftpPathEnc: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    clearinghouseEnabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    clearinghouseLastPolledAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    clearinghouseLastSuccessAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    clearinghouseLastError: Mapped[str | None] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime)
 
 
@@ -125,7 +129,7 @@ class Payer(Base):
     faxNumber: Mapped[str | None] = mapped_column(String, nullable=True)
     appealAddress: Mapped[str | None] = mapped_column(String, nullable=True)
     epaSupported: Mapped[bool] = mapped_column(Boolean)
-    appealWindowDays: Mapped[int] = mapped_column(Integer)
+    appealWindowDays: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class PayerPolicy(Base):
@@ -180,6 +184,7 @@ class Claim(Base):
     icdCodes: Mapped[list[str]] = mapped_column(ARRAY(String))
     billedAmount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     controlNumber: Mapped[str | None] = mapped_column(String, nullable=True)
+    renderingProvider: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(ClaimStatusPgEnum)
     submittedAt: Mapped[datetime] = mapped_column(DateTime)
     patient: Mapped[Patient] = relationship(Patient, lazy="joined", foreign_keys=[patientId])
@@ -195,9 +200,14 @@ class Denial(Base):
     denialReason: Mapped[str] = mapped_column(Text)
     deniedAmount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     eraRawText: Mapped[str] = mapped_column(Text)
+    serviceCpt: Mapped[str | None] = mapped_column(String, nullable=True)
     receivedAt: Mapped[datetime] = mapped_column(DateTime)
     chartExcerptsText: Mapped[str | None] = mapped_column(Text, nullable=True)
     filingDeadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    predictedWinProb: Mapped[float | None] = mapped_column(nullable=True)
+    priorityScore: Mapped[float | None] = mapped_column(nullable=True)
+    priorityTier: Mapped[str | None] = mapped_column(String, nullable=True)
+    scoreExplain: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     claim: Mapped[Claim] = relationship(Claim, lazy="joined", foreign_keys=[claimId])
 
 
@@ -215,6 +225,7 @@ class Appeal(Base):
     recoveredAmount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     ourFee: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     outcomeRecordedAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    confidenceScore: Mapped[float | None] = mapped_column(nullable=True)
     agentRunId: Mapped[str | None] = mapped_column(String, ForeignKey("AgentRun.id"), nullable=True)
     humanReviewId: Mapped[str | None] = mapped_column(String, nullable=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime)

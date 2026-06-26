@@ -1,0 +1,35 @@
+CEDAR FAMILY PRACTICE
+Established Patient Visit
+
+Patient: Goodman, Elliot
+DOB: 1981-04-17          MRN: CFP-0077665
+Date of Service: 01/10/2023
+Rendering Provider: Joseph Whitman, MD
+Encounter Type: Established patient, low complexity (CPT 99213)
+Claim Control Number: UHC-2024041901
+
+CHIEF COMPLAINT
+Annual chronic disease follow-up — hypertension, lipid management.
+
+HPI
+42-year-old male presents for routine 6-month follow-up. Reports
+adherence to lisinopril 10 mg daily; home BP averaging 128/82. No
+chest pain, dyspnea, or palpitations.
+
+EXAM / VITALS
+BP 132/84   HR 68   BMI 26.1. CV/Pulm unremarkable.
+
+ASSESSMENT/PLAN
+1. Essential hypertension (I10) — well controlled. Continue lisinopril.
+2. Hyperlipidemia (E78.5) — last LDL 112, started atorvastatin 20 mg
+   QHS at prior visit. Repeat lipid panel in 8 weeks.
+RTC 6 months.
+
+Signed: Whitman, J. MD — 01/10/2023 09:48
+
+BILLING NOTE (re: timely filing CO-29 denial):
+Initial claim was submitted 01/12/2023 (within 2 days of DOS).
+Original 837P submission ID 8819-2023-A confirmed by clearinghouse.
+Resubmitted 06/03/2023 after first denial due to subscriber ID typo
+(corrected on resubmission). Documentation of original submission
+date attached as proof of timely filing per UHC policy section 5.4.

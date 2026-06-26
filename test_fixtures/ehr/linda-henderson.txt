@@ -1,0 +1,47 @@
+GREENFIELD INTERNAL MEDICINE
+Progress Note
+
+Patient: Henderson, Linda
+DOB: 1952-06-04          MRN: GFM-001218
+Date of Service: 01/08/2024
+Encounter Type: Established patient follow-up (15 min)
+Rendering Provider: Anjali Mehta, MD
+
+CHIEF COMPLAINT
+Routine follow-up for type 2 diabetes mellitus and essential hypertension.
+
+HPI
+71-year-old retired schoolteacher presents for scheduled 3-month
+diabetes/HTN follow-up. Reports adherence to metformin 1000 mg BID and
+lisinopril 20 mg daily. Home glucose log shows fasting values 110-140;
+post-prandial occasionally 180s. BP at home averages 132/78. Denies
+hypoglycemia, chest pain, dyspnea, polyuria. No new complaints today.
+
+MEDICATIONS
+- Metformin 1000 mg PO BID
+- Lisinopril 20 mg PO daily
+- Atorvastatin 40 mg PO QHS
+- ASA 81 mg PO daily
+
+VITALS
+BP 134/80   HR 72   RR 14   SpO2 98% RA   Wt 168 lb   BMI 28.4
+
+EXAM
+Gen: Well-appearing, NAD. CV: RRR, no murmur. Lungs: CTAB.
+Abd: soft, NT/ND. Ext: no edema. Skin: feet inspected — no ulcers,
+intact monofilament sensation x10 points bilaterally.
+
+ASSESSMENT/PLAN
+1. Type 2 diabetes mellitus (E11.9) — improved control. A1C in 11/2023 = 6.9.
+   Continue current regimen. Repeat A1C 4/2024.
+2. Essential hypertension (I10) — controlled on lisinopril. Continue.
+3. Hyperlipidemia (E78.5) — LDL 88 on atorvastatin. Continue.
+4. Routine health maintenance — flu vaccine offered & administered
+   today (separate claim).
+
+E/M LEVEL: 99213 — established patient, low-complexity MDM, two stable
+chronic conditions with medication management.
+
+Patient verbalized understanding. Follow-up 3 months.
+
+Electronically signed: Mehta, Anjali MD on 01/08/2024 14:22

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StructuredClinicalContext } from "@/components/StructuredClinicalContext";
 
@@ -14,11 +14,50 @@ export function ChartExcerptsForm({
   locked: boolean;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [text, setText] = useState(initialText);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    // Clear any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Set new auto-save timeout (1.5 second debounce)
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSaveContext();
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [text]);
+
+  const autoSaveContext = () => {
+    setAutoSaving(true);
+    startTransition(async () => {
+      const res = await fetch(`/api/denials/${denialId}/chart`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chartExcerptsText: text }),
+      });
+      if (!res.ok) {
+        setErr(await res.text());
+        setAutoSaving(false);
+        return;
+      }
+      setLastSavedAt(new Date());
+      setAutoSaving(false);
+      setErr(null);
+    });
+  };
 
   // Analyze clinical context quality
   const getContextQuality = (context: string) => {
@@ -104,30 +143,6 @@ export function ChartExcerptsForm({
     }
   };
 
-  const handleSave = () => {
-    setErr(null);
-    setSaved(false);
-    startTransition(async () => {
-      const res = await fetch(`/api/denials/${denialId}/chart`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chartExcerptsText: text }),
-      });
-      if (!res.ok) {
-        setErr(await res.text());
-        return;
-      }
-      setSaved(true);
-      setLastSavedAt(new Date());
-      router.refresh();
-    });
-  };
-
-  const handleContextChange = (newContext: string) => {
-    setText(newContext);
-    // Auto-save when context changes (debounced in real implementation)
-    setSaved(false);
-  };
 
   if (locked) {
     return (
@@ -160,36 +175,24 @@ export function ChartExcerptsForm({
       <StructuredClinicalContext
         denialId={denialId}
         initialContext={initialText}
-        onContextChange={handleContextChange}
+        onContextChange={setText}
       />
 
-      {/* Context Quality Indicator */}
+      {/* Context Quality Indicator + Auto-save status */}
       <div className="flex items-center justify-between mb-4">
         {getQualityIndicator()}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={pending}
-              className="btn-primary disabled:opacity-50"
-            >
-              {pending ? "Saving…" : "Save clinical context"}
-            </button>
-            {saved && (
-              <span className="text-sm text-success-700 flex items-center">
-                ✓ Saved successfully
-              </span>
-            )}
-            {err && <span className="text-sm text-error-700">{err}</span>}
-          </div>
+        <div className="flex items-center gap-3">
+          {autoSaving && (
+            <span className="text-xs text-gray-500 flex items-center">
+              <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse mr-2"></span>
+              Auto-saving...
+            </span>
+          )}
+          {err && <span className="text-xs text-error-700">{err}</span>}
           {lastSavedAt && (
-            <div className="text-xs text-gray-500">
-              Last saved: {lastSavedAt.toLocaleTimeString()} on {lastSavedAt.toLocaleDateString()}
-            </div>
+            <span className="text-xs text-gray-500">
+              Saved {lastSavedAt.toLocaleTimeString()}
+            </span>
           )}
         </div>
       </div>

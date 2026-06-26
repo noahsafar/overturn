@@ -41,7 +41,9 @@ import os
 import pickle
 import re
 import smtplib
+import socket
 import ssl
+import subprocess
 import sys
 import time
 from email.message import EmailMessage
@@ -50,6 +52,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 LEADS_CSV = ROOT / "docs" / "sales" / "leads.csv"
 LOG_FILE = ROOT / "outreach" / "sent-log.jsonl"
+DEAD_EMAILS_FILE = ROOT / "outreach" / "dead-emails.txt"
 CRED_FILE = Path.home() / ".config" / "overturn" / "gmail.env"
 AIDEN_TOKEN = Path.home() / ".aiden" / "token.pickle"
 
@@ -67,13 +70,13 @@ SUBJECT_TEMPLATE = "{specialty_short} practice + denied claims — Yale student 
 BODY_TEMPLATE = """\
 {greeting},
 
-I'm a Yale student building Overturn — software that automates appeals on denied insurance claims for small in-network practices. We draft the appeal letter against the payer's published medical policies, cite real chart notes, get a human at your practice to approve, then submit through the portal.
+I'm a Yale student building software to help small practices recover denied insurance claims — but before going further, I'm trying to understand what the problem actually looks like from the practice side.
 
-{specialty_line} denials — {denial_examples} — are some of the hardest to work without a dedicated appeals team. I'd love 15 minutes to learn how {practice_name} handles them today.
+{specialty_line} practices often run into things like {denial_examples}. I'd be incredibly grateful for even 10 minutes to hear how {practice_name} handles these.
 
-Not pitching — research call.
+Would you be open to a quick call?
 
-Thanks,
+Thank you,
 {signature}
 """
 
@@ -235,6 +238,166 @@ def render_email(row: dict) -> tuple[str, str]:
     return subject, body
 
 
+# ── Email-address validation ─────────────────────────────────────────────
+# Cold-outreach addresses are easy to mistype or invent. These helpers catch
+# guaranteed bounces (unresolvable domains) before we burn a send on them.
+
+_MX_CACHE: dict[str, list[str]] = {}
+
+
+def email_domain(email: str) -> str:
+    return email.rsplit("@", 1)[1].lower().strip() if "@" in (email or "") else ""
+
+
+def get_mx_hosts(domain: str) -> list[str]:
+    """MX hosts for `domain`, sorted by priority. Empty list = no MX records.
+    Uses `dig` (always present on macOS/Linux). Result is cached per process."""
+    if not domain:
+        return []
+    if domain in _MX_CACHE:
+        return _MX_CACHE[domain]
+    try:
+        res = subprocess.run(
+            ["dig", "+short", "+time=3", "+tries=1", "mx", domain],
+            capture_output=True, text=True, timeout=8,
+        )
+    except Exception:
+        _MX_CACHE[domain] = []
+        return []
+    parsed: list[tuple[int, str]] = []
+    for line in res.stdout.strip().splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            try:
+                pri = int(parts[0])
+            except ValueError:
+                continue
+            parsed.append((pri, parts[1].rstrip(".")))
+    parsed.sort()
+    hosts = [h for _, h in parsed]
+    _MX_CACHE[domain] = hosts
+    return hosts
+
+
+def domain_resolves(domain: str) -> bool:
+    """True if `domain` has an MX record, or (per RFC 5321) an A record fallback.
+    False ⇒ mail to this domain is guaranteed to bounce."""
+    if not domain:
+        return False
+    if get_mx_hosts(domain):
+        return True
+    try:
+        res = subprocess.run(
+            ["dig", "+short", "+time=3", "+tries=1", "a", domain],
+            capture_output=True, text=True, timeout=8,
+        )
+        return bool(res.stdout.strip())
+    except Exception:
+        # Don't punish the lead for a flaky lookup — assume live.
+        return True
+
+
+def smtp_probe(email: str, sender: str, timeout: int = 10) -> str:
+    """Best-effort RCPT TO probe. Returns 'valid' | 'invalid' | 'unknown'.
+
+    Many providers (Gmail, Microsoft 365) intentionally don't reveal mailbox
+    existence and answer 250 to every RCPT TO — those come back 'unknown'.
+    Cheap providers (GoDaddy/secureserver, cPanel hosts) do reveal it, which
+    is where most of our bounces have lived.
+
+    Outbound port 25 is blocked on some networks; failures degrade to 'unknown'
+    so a probe failure never blocks a send.
+    """
+    if "@" not in (email or ""):
+        return "invalid"
+    domain = email_domain(email)
+    if not domain:
+        return "invalid"
+    mx_hosts = get_mx_hosts(domain) or [domain]
+    for host in mx_hosts[:2]:
+        try:
+            smtp = smtplib.SMTP(host, 25, timeout=timeout)
+        except (socket.timeout, socket.gaierror, ConnectionError, OSError):
+            continue
+        try:
+            try:
+                smtp.ehlo_or_helo_if_needed()
+                smtp.mail(sender)
+                code, _ = smtp.rcpt(email)
+            finally:
+                try:
+                    smtp.quit()
+                except Exception:
+                    pass
+        except smtplib.SMTPException:
+            continue
+        if 200 <= code < 300:
+            return "valid"
+        if code in (550, 551, 553, 510, 511):
+            return "invalid"
+        return "unknown"
+    return "unknown"
+
+
+def load_dead_emails() -> set[str]:
+    """Emails previously flagged dead (one per line, with optional trailing
+    `# reason` comment). Skipped on future sends."""
+    if not DEAD_EMAILS_FILE.exists():
+        return set()
+    out: set[str] = set()
+    for line in DEAD_EMAILS_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        email = line.split("#", 1)[0].strip().lower()
+        if email:
+            out.add(email)
+    return out
+
+
+def append_dead_emails(records: list[tuple[str, str]]) -> int:
+    """Append `(email, reason)` pairs to outreach/dead-emails.txt, skipping
+    addresses already recorded. Returns the number of new lines written."""
+    if not records:
+        return 0
+    existing = load_dead_emails()
+    new = [(e.lower(), r) for e, r in records if e and e.lower() not in existing]
+    if not new:
+        return 0
+    DEAD_EMAILS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    today = dt.date.today().isoformat()
+    with DEAD_EMAILS_FILE.open("a") as f:
+        for email, reason in new:
+            f.write(f"{email}  # {today} :: {reason}\n")
+    return len(new)
+
+
+def validate_candidate(row: dict, *, dead_set: set[str], probe: bool, sender: str
+                       ) -> tuple[str, str]:
+    """Classify one lead. Returns (status, reason) where status is one of:
+    'live'    — send it
+    'dead'    — guaranteed/known bounce, skip and record
+    'unknown' — could not verify, but don't block the send
+    """
+    email = (row.get("email") or "").strip().lower()
+    if not email:
+        return "dead", "no email"
+    if email in dead_set:
+        return "dead", "previously flagged as dead"
+    domain = email_domain(email)
+    if not domain or "." not in domain:
+        return "dead", f"invalid address: {email}"
+    if not domain_resolves(domain):
+        return "dead", f"no MX/A record for {domain}"
+    if probe:
+        r = smtp_probe(email, sender)
+        if r == "invalid":
+            return "dead", f"SMTP rejected mailbox at {domain}"
+        if r == "unknown":
+            return "unknown", f"could not verify mailbox at {domain}"
+    return "live", "ok"
+
+
 def load_credentials() -> tuple[str, str]:
     """Read OVERTURN_GMAIL_USER / OVERTURN_GMAIL_APP_PASSWORD from env or
     ~/.config/overturn/gmail.env."""
@@ -277,7 +440,7 @@ def read_leads() -> tuple[list[str], list[dict]]:
 
 def write_leads(fieldnames: list[str], rows: list[dict]) -> None:
     with LEADS_CSV.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
+        w = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
 
@@ -504,6 +667,66 @@ def run_followup_batch(args) -> int:
     return 0 if err_count == 0 else 2
 
 
+def run_validate_only(args) -> int:
+    """Walk every uncontacted lead in leads.csv. Validate each email's domain
+    (and optionally probe the mailbox with --probe-mailbox). Print a report.
+    Append dead addresses to outreach/dead-emails.txt so they're auto-skipped
+    on future sends. Does not send mail or modify leads.csv."""
+    filt = parse_filter(args.filter)
+    _, rows = read_leads()
+    dead_set = load_dead_emails()
+    probe_sender = os.environ.get("OVERTURN_GMAIL_USER", "verify@example.com")
+
+    targets = []
+    for row in rows:
+        if (row.get("first_outreach_date") or "").strip():
+            continue
+        if not (row.get("email") or "").strip():
+            continue
+        if not matches_filter(row, filt):
+            continue
+        if args.practice and args.practice.lower() not in (row.get("practice_name", "") or "").lower():
+            continue
+        targets.append(row)
+
+    if not targets:
+        print("No uncontacted leads match. Nothing to validate.")
+        return 0
+
+    print(f"Validating {len(targets)} uncontacted lead(s). "
+          f"Probe mailbox: {args.probe_mailbox}.")
+    print()
+
+    live_count = 0
+    unknown_count = 0
+    dead_records: list[tuple[str, str]] = []
+    for row in targets:
+        status, reason = validate_candidate(
+            row, dead_set=dead_set, probe=args.probe_mailbox, sender=probe_sender,
+        )
+        email = (row.get("email") or "").strip().lower()
+        name = row.get("practice_name", "")
+        if status == "dead":
+            dead_records.append((email, reason))
+            print(f"  ❌ {name:<40} {email:<40} {reason}")
+        elif status == "unknown":
+            unknown_count += 1
+            print(f"  ?  {name:<40} {email:<40} {reason}")
+        else:
+            live_count += 1
+
+    print()
+    print(f"Summary: live={live_count}  unknown={unknown_count}  dead={len(dead_records)}")
+    if dead_records:
+        n_new = append_dead_emails(dead_records)
+        already = len(dead_records) - n_new
+        msg = f"Recorded {n_new} new dead address(es) in {DEAD_EMAILS_FILE}"
+        if already:
+            msg += f" ({already} already known)"
+        print(msg + ".")
+    return 0
+
+
 def run_test_send(args) -> int:
     """One-off send to args.to using a template rendered from args.as_practice
     (or a generic placeholder). Bypasses leads.csv entirely. Does NOT update
@@ -655,6 +878,19 @@ def main() -> int:
                     help="Min days since original outreach to qualify for follow-up (default 2).")
     ap.add_argument("--i-know-what-im-doing", action="store_true",
                     help=f"Bypass HARD_DAILY_CAP of {HARD_DAILY_CAP}.")
+    ap.add_argument("--no-validate", action="store_true",
+                    help="Skip MX/DNS validation. Default behavior is to drop "
+                         "candidates whose domain has no MX or A record so we "
+                         "don't waste sends on guaranteed bounces.")
+    ap.add_argument("--probe-mailbox", action="store_true",
+                    help="Best-effort SMTP RCPT TO probe per address. Catches "
+                         "dead mailboxes on cheap shared hosts (GoDaddy/cPanel) "
+                         "but adds latency and doesn't work for Gmail/M365. "
+                         "Outgoing port 25 must be reachable.")
+    ap.add_argument("--validate-only", action="store_true",
+                    help="Walk every uncontacted lead in leads.csv, validate "
+                         "each email, append dead ones to outreach/dead-emails.txt, "
+                         "and print a report. Does not send.")
     args = ap.parse_args()
 
     # One-off test-send path
@@ -665,15 +901,24 @@ def main() -> int:
     if args.follow_up:
         return run_followup_batch(args)
 
+    # Pre-flight validation-only path
+    if args.validate_only:
+        return run_validate_only(args)
+
     filt = parse_filter(args.filter)
     fieldnames, rows = read_leads()
+    dead_set = load_dead_emails()
 
-    # Build the candidate list: has email, no first_outreach_date, matches filters
+    # Build the candidate list: has email, no first_outreach_date, matches filters,
+    # not previously flagged as dead.
     candidates = []
     for i, row in enumerate(rows):
         if (row.get("first_outreach_date") or "").strip():
             continue
-        if not (row.get("email") or "").strip():
+        email = (row.get("email") or "").strip().lower()
+        if not email:
+            continue
+        if email in dead_set:
             continue
         if not matches_filter(row, filt):
             continue
@@ -687,6 +932,37 @@ def main() -> int:
 
     # Apply --limit
     candidates = candidates[: args.limit]
+
+    # Domain/mailbox validation. Drop guaranteed-bounce rows so we don't waste
+    # a send (and don't burn sender reputation on the Gmail account).
+    if not args.no_validate:
+        live: list = []
+        dead_records: list[tuple[str, str]] = []
+        probe_sender = os.environ.get("OVERTURN_GMAIL_USER", "verify@example.com")
+        for entry in candidates:
+            _, row = entry
+            status, reason = validate_candidate(
+                row, dead_set=dead_set, probe=args.probe_mailbox, sender=probe_sender,
+            )
+            if status == "dead":
+                dead_records.append(((row.get("email") or "").strip().lower(), reason))
+            else:
+                live.append(entry)
+        if dead_records:
+            print(f"Dropped {len(dead_records)} candidate(s) — failed pre-send validation:")
+            for email, reason in dead_records[:10]:
+                print(f"  - {email} :: {reason}")
+            if len(dead_records) > 10:
+                print(f"  … and {len(dead_records) - 10} more.")
+            n_new = append_dead_emails(dead_records)
+            if n_new:
+                print(f"Recorded {n_new} new dead address(es) in {DEAD_EMAILS_FILE} "
+                      f"so they're skipped on future runs.")
+            print()
+        candidates = live
+        if not candidates:
+            print("All candidates failed validation. Nothing to send.")
+            return 0
 
     # Daily cap check
     sent_today = already_sent_today_count()
@@ -730,6 +1006,7 @@ def main() -> int:
             to = row["email"].strip()
             try:
                 msg_id = sender.send(to, subj, body)
+                rows[row_idx]["STATUS"] = "📧 SENT"
                 rows[row_idx]["first_outreach_date"] = today
                 rows[row_idx]["channel"] = "email"
                 write_leads(fieldnames, rows)

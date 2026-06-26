@@ -1,0 +1,4 @@
+"Patient ID","Patient First Name","Patient Last Name","Date of Birth","Insurance ID","Insurance Company","Date of Service","Procedure Code","Diagnosis Code","Charge Amount","Adjustment Code","Reason","Adjustment Amount","Payment Date"
+PT-2001,Maria,Hernandez,1991-04-22,CIG223344556,Cigna,2024-05-02,99204,Z23,295.00,CO-50,Not medically necessary,295.00,2024-05-15
+PT-2002,Tyrese,Brooks,1969-07-09,CIG334455667,Cigna,2024-05-04,71046,J18.9,180.00,CO-45,Fee schedule,72.00,2024-05-16
+PT-2003,Soo,Yoon,1958-12-30,CIG445566778,Cigna,2024-05-07,99213,I10,145.00,PR-3,Co-pay,40.00,2024-05-17

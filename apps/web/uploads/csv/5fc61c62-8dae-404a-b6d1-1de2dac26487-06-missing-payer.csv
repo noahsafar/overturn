@@ -1,0 +1,3 @@
+patient_id,first_name,last_name,dob,member_id,service_date,cpt,billed_amount,denial_code,denial_reason,denied_amount
+PT-6001,LINDSEY,RHODES,1990-07-22,M998877221,2024-08-10,99214,215.00,CO-45,Fee schedule,87.20
+PT-6002,KWAME,OSEI,1972-02-15,M887766112,2024-08-12,93010,120.00,CO-96,Non-covered,120.00

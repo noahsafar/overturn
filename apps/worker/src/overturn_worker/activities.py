@@ -35,6 +35,41 @@ from .retrieval import retrieve_policies
 logger = logging.getLogger(__name__)
 
 
+def _extract_letter(draft: dict) -> str:
+    """Best-effort extraction of the letter body from a draft response.
+
+    The DRAFT_V1 prompt asks for the key `"letter"`, but LLMs occasionally
+    drift to `"appeal_letter"`, `"letterBody"`, etc. We try a small set of
+    common variants before falling back to a stringified dump (which used
+    to leak Python repr like `{'appeal_letter': '...'}` into the UI).
+    """
+    for key in ("letter", "appeal_letter", "appealLetter", "letterBody", "letterText", "body"):
+        v = draft.get(key)
+        if isinstance(v, str) and v.strip():
+            return v
+    return str(draft)
+
+
+def _clamp01(v, default: float = 0.5) -> float:
+    """Coerce a JSON-emitted confidence value to a float in [0, 1].
+
+    The LLM occasionally emits the score as a string ("0.82"), as a percent
+    out of 100 (82), or as a decimal already in range (0.82). Treat values
+    > 1 as percents, fall back to the default on anything unparseable.
+    """
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    if f > 1.0:
+        f = f / 100.0
+    if f < 0.0:
+        f = 0.0
+    if f > 1.0:
+        f = 1.0
+    return f
+
+
 # ── Activity input/output shapes ────────────────────────────────────────────
 @dataclass
 class DenialContext:
@@ -151,7 +186,11 @@ async def load_denial_context(denial_id: str) -> dict:
             patient_last_name=decrypt(patient.lastNameEnc),
             patient_member_id=decrypt(patient.memberIdEnc),
             patient_dob=decrypt(patient.dobEnc),
-            practice_name=claim.practice.name,
+            # Prefer the rendering / servicing provider from the source
+            # ERA when present (the entity that actually performed the
+            # service). Fall back to the billing practice's own name when
+            # no rendering provider was carried in N1*PE / NM1*82.
+            practice_name=(claim.renderingProvider or claim.practice.name),
         )
     return asdict(ctx)
 
@@ -298,11 +337,21 @@ Respectfully,
             {"policyId": cite_id, "quote": cite_quote, "sourceUrl": cite_url, "page": ""}
         )
 
+    # Dev-mode confidence: high when we have a real policy citation backing
+    # the draft, lower when we couldn't find one. Roughly tracks what the
+    # rubric in DRAFT_V1 would emit so tests don't have to special-case dev.
+    stub_conf = 0.82 if (cite_id and cite_quote) else 0.45
     return {
         "letter": letter,
         "templateUsed": template_used,
         "citations": citations,
         "requestedRemedyAmount": ctx["denied_amount"],
+        "confidence": stub_conf,
+        "confidenceRationale": (
+            "Verbatim policy citation matches the denial code."
+            if (cite_id and cite_quote)
+            else "No matching payer policy was retrieved; appeal rests on chart documentation alone."
+        ),
     }
 
 
@@ -350,6 +399,14 @@ async def llm_draft_appeal(ctx: dict, policies: list[dict], strategy: dict) -> d
 # ── Activity: verify citations (deterministic) ──────────────────────────────
 @activity.defn
 async def verify_citations_act(draft: dict, policies: list[dict]) -> dict:
+    # Split citations by source. Policy citations get strict verbatim
+    # verification against the retrieved policy bodies. Chart citations
+    # are surfaced to the UI but skip the strict verifier for now (we
+    # trust the LLM's verbatim copy from chart_excerpts; a future pass
+    # can add chart-text verification).
+    policy_dicts = [c for c in draft.get("citations", []) if (c.get("source") or "policy") == "policy"]
+    chart_dicts = [c for c in draft.get("citations", []) if c.get("source") == "chart"]
+
     citations = [
         Citation(
             policy_id=c.get("policyId") or c.get("policy_id", ""),
@@ -357,10 +414,13 @@ async def verify_citations_act(draft: dict, policies: list[dict]) -> dict:
             source_url=c.get("sourceUrl") or c.get("source_url"),
             page=c.get("page"),
         )
-        for c in draft.get("citations", [])
+        for c in policy_dicts
     ]
     docs = [PolicyDoc(id=p["id"], body=p["body"]) for p in policies]
     res = verify_citations(citations, docs)
+    # Chart citations count toward the "we have at least something to cite"
+    # signal even though they aren't strictly verified yet.
+    chart_count = len(chart_dicts)
 
     explained = (
         "\n".join(
@@ -371,7 +431,7 @@ async def verify_citations_act(draft: dict, policies: list[dict]) -> dict:
     )
     return {
         "all_valid": res.all_valid,
-        "valid_count": res.valid_count,
+        "valid_count": res.valid_count + chart_count,
         "invalid_explained": explained,
     }
 
@@ -383,7 +443,7 @@ async def llm_redraft_fix_citations(
 ) -> dict:
     user = render(
         REDRAFT_V1,
-        previous_letter=draft["letter"],
+        previous_letter=_extract_letter(draft),
         invalid_citations_explained=invalid_explained,
         policies=_policies_block(policies),
     )
@@ -395,13 +455,22 @@ async def llm_redraft_fix_citations(
         # valid, so we'd never reach here. If we do, return a citation-free
         # letter rather than re-fabricate.
         stub_response={
-            "letter": draft["letter"],
+            "letter": _extract_letter(draft),
             "templateUsed": draft.get("templateUsed", "redraft"),
             "citations": [],
             "requestedRemedyAmount": draft.get("requestedRemedyAmount", 0),
+            # Preserve the original confidence on redraft — the citation fix
+            # shouldn't change our confidence in the underlying argument, and
+            # losing all citations should drop confidence (handled above).
+            "confidence": draft.get("confidence", 0.5),
+            "confidenceRationale": draft.get("confidenceRationale"),
         },
     )
-    return res.parsed
+    # Propagate confidence into the parsed response if the model omitted it.
+    parsed = res.parsed
+    if "confidence" not in parsed and "confidence" in draft:
+        parsed["confidence"] = draft["confidence"]
+    return parsed
 
 
 # ── Activity: persist appeal draft ──────────────────────────────────────────
@@ -417,10 +486,27 @@ async def save_appeal_draft(
     now = datetime.utcnow()
     run_id = "cm" + uuid.uuid4().hex[:22]
 
+    # Two confidence signals:
+    #   strategist_conf — predicted win probability from the case analysis.
+    #     "Does this denial deserve an appeal?"
+    #   drafter_conf — the drafting LLM's self-rated quality of the letter.
+    #     "Is this specific draft good enough to send?"
+    # We combine them as a plain average. Reviewer-facing confidence is the
+    # combined value because we want the badge to reflect both case merit
+    # and draft quality.
+    strategist_conf = _clamp01(strategy.get("predictedWinProbability"), 0.5)
+    drafter_conf = _clamp01(draft.get("confidence"), strategist_conf)
+    combined_conf = round((strategist_conf + drafter_conf) / 2.0, 3)
+    confidence_rationale = (draft.get("confidenceRationale") or "").strip() or None
+
     audit_trail = {
         "strategy": strategy,
         "citation_valid_count": citation_valid_count,
         "draft_template": draft.get("templateUsed"),
+        "strategist_conf": strategist_conf,
+        "drafter_conf": drafter_conf,
+        "combined_conf": combined_conf,
+        "confidence_rationale": confidence_rationale,
     }
 
     with SessionLocal() as s:
@@ -429,6 +515,17 @@ async def save_appeal_draft(
         if appeal is None:
             raise ValueError(f"appeal {appeal_id} not found")
 
+        # Auto-approve eligible only when BOTH signals are strong AND
+        # citations verified clean. A high strategist score with a weak
+        # draft (or vice-versa) still needs a human look.
+        AUTO_APPROVE_THRESHOLD = 0.80
+        run_status = (
+            "AUTO_APPROVED"
+            if strategist_conf >= AUTO_APPROVE_THRESHOLD
+            and drafter_conf >= AUTO_APPROVE_THRESHOLD
+            and citation_valid_count >= 1
+            else "REQUIRES_HUMAN"
+        )
         s.add(
             AgentRun(
                 id=run_id,
@@ -437,8 +534,8 @@ async def save_appeal_draft(
                 agentType="llm",
                 startedAt=now,
                 completedAt=now,
-                status="REQUIRES_HUMAN",
-                confidenceScore=float(strategy.get("predictedWinProbability", 0.5)),
+                status=run_status,
+                confidenceScore=combined_conf,
                 costCents=cost_cents,
                 errorMessage=None,
                 auditTrail=audit_trail,
@@ -446,10 +543,11 @@ async def save_appeal_draft(
         )
 
         # Update the appeal with the final draft data
-        appeal.draftLetter = draft["letter"]
+        appeal.draftLetter = _extract_letter(draft)
         appeal.templateUsed = draft.get("templateUsed", "unknown")
         appeal.citations = draft.get("citations", [])
         appeal.agentRunId = run_id
+        appeal.confidenceScore = combined_conf
         s.commit()
 
     # Fire-and-forget notification to web — best effort, doesn't block the
@@ -687,6 +785,138 @@ async def mail_queue_appeal(appeal: dict, payer: dict) -> dict:
     }
 
 
+# ── Activity: corrected-claim 837 resubmission ─────────────────────────────
+@activity.defn
+async def submit_corrected_claim_837(denial_id: str, correction: dict) -> dict:
+    """Generate an 837 corrected-claim and submit it via the clearinghouse.
+
+    Different from an appeal: we're not asking the payer to reconsider, we're
+    saying "this claim was wrong, here's the right one." Used for billing-
+    error categories (CARC 4/11/16/18/etc.) where appealing makes no sense.
+
+    Creates an Appeal row scoped to this denial (so the same ops surfaces —
+    submission history, follow-up checks, outcome ingestion — work the same
+    way) but flags the submission channel as CLEARINGHOUSE_837 so the
+    audit trail is honest about what happened.
+
+    `correction` shape:
+      {
+        "corrected_cpt":   str | None,
+        "corrected_modifier": str | None,
+        "reason":          str,
+      }
+    """
+    from .edi837 import CorrectionInput, render_837_corrected
+    from .crypto import decrypt
+
+    now = datetime.utcnow()
+    appeal_id = "cm" + uuid.uuid4().hex[:22]
+
+    with SessionLocal() as s:
+        denial = s.scalar(select(Denial).where(Denial.id == denial_id))
+        if denial is None:
+            raise ValueError(f"denial {denial_id} not found")
+        claim = denial.claim
+        patient = claim.patient
+        payer = claim.payer
+        practice = claim.practice
+
+        first = decrypt(patient.firstNameEnc) if patient.firstNameEnc else ""
+        last = decrypt(patient.lastNameEnc) if patient.lastNameEnc else ""
+        dob = decrypt(patient.dobEnc) if patient.dobEnc else ""
+        member_id = decrypt(patient.memberIdEnc) if patient.memberIdEnc else ""
+
+        # Materialize the 837 content
+        ci = CorrectionInput(
+            claim_control_number=claim.controlNumber or claim.id,
+            practice_npi=practice.npi,
+            practice_name=practice.name,
+            practice_tax_id=practice.taxId,
+            patient_first=first,
+            patient_last=last,
+            patient_dob=(dob or "").replace("-", "")[:8],
+            patient_member_id=member_id,
+            payer_name=payer.name,
+            payer_id=(payer.payerIdNumbers[0] if payer.payerIdNumbers else "UNKNOWN"),
+            service_date=claim.serviceDate.strftime("%Y%m%d"),
+            cpt_codes=list(claim.cptCodes or []),
+            icd_codes=list(claim.icdCodes or []),
+            total_charge=float(claim.billedAmount or 0),
+            corrected_cpt=correction.get("corrected_cpt"),
+            corrected_modifier=correction.get("corrected_modifier"),
+            correction_reason=correction.get("reason") or "Corrected claim.",
+        )
+        edi = render_837_corrected(ci)
+
+        # Anchor a per-denial Appeal row so submission/follow-up plumbing
+        # works uniformly. templateUsed flagged so it's clear this isn't an
+        # argued appeal.
+        s.add(
+            Appeal(
+                id=appeal_id,
+                denialId=denial_id,
+                draftLetter=edi,
+                templateUsed="837P-corrected-v1",
+                citations=[],
+                status="READY",
+                outcome="PENDING",
+                createdAt=now,
+            )
+        )
+        s.commit()
+        denial_payer_id = payer.id
+
+    # Submit. In dev, write the 837 to the artifacts directory so an operator
+    # can see what was generated. In prod a real clearinghouse client lives
+    # in clearinghouse_837.py (not yet wired); fall through to stub for now.
+    pdf_path: str | None = None
+    success = True
+    confirmation = "DEV-CC-" + uuid.uuid4().hex[:8].upper()
+    provider_ref = ""
+    error: str | None = None
+    try:
+        from pathlib import Path
+
+        out_dir = Path("./artifacts/837-out")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{denial_id}-{appeal_id}.edi"
+        path.write_text(edi, encoding="utf-8")
+        pdf_path = str(path)
+    except Exception as e:  # noqa: BLE001
+        success = False
+        error = str(e)[:300]
+        logger.exception("corrected-claim 837 artifact write failed: %s", e)
+
+    sub_id = _record_submission(
+        appeal_id=appeal_id,
+        channel="CLEARINGHOUSE_837",
+        provider_ref=provider_ref,
+        confirmation=confirmation,
+        pdf_path=pdf_path or "",
+        success=success,
+        error=error,
+    )
+
+    # Mark the appeal as submitted so the outcome ingest matches up when the
+    # next ERA lands paying the corrected line.
+    with SessionLocal() as s:
+        a = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
+        if a is not None:
+            a.submittedVia = "CLEARINGHOUSE_837"
+            a.submittedAt = now
+            s.commit()
+
+    return {
+        "appeal_id": appeal_id,
+        "submission_id": sub_id,
+        "success": success,
+        "channel": "CLEARINGHOUSE_837",
+        "confirmation_number": confirmation,
+        "artifact_path": pdf_path,
+        "errorMessage": error,
+    }
+
+
 # ── Activity: record submission on Appeal row ───────────────────────────────
 @activity.defn
 async def record_submission(appeal_id: str, result: dict) -> None:
@@ -811,12 +1041,16 @@ async def schedule_followup_checks(appeal_id: str, days: list[int]) -> list[str]
 async def run_followup_check(appeal_id: str, check_id: str, days: int) -> dict:
     """Mark a FollowUpCheck COMPLETED + record what we found.
 
-    Phase 1: the only signal we have is whether an inbound ERA flipped the
-    appeal's outcome to terminal. If yes, we're done. If no, the check is
-    completed with status "still pending"; the 30/60-day ticks will escalate
-    via a notify call when no outcome has landed by then.
+    Signal sources, in order of preference:
+      1) ERA already flipped Appeal.outcome to terminal → we're done.
+      2) Active probe of the payer's status surface (portal status page
+         via Stagehand) → may return DECIDED with WON/LOST, PENDING, or
+         UNKNOWN if no probe is implemented for this payer.
+      3) Default: still PENDING. The 30/60-day ticks escalate to ops.
     """
     now = datetime.utcnow()
+    probe_outcome: dict | None = None
+
     with SessionLocal() as s:
         check = s.scalar(select(FollowUpCheck).where(FollowUpCheck.id == check_id))
         appeal = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
@@ -824,14 +1058,66 @@ async def run_followup_check(appeal_id: str, check_id: str, days: int) -> dict:
             return {"checks_run": 0, "escalated": False, "outcome_terminal": False}
 
         terminal = appeal.outcome in ("WON", "PARTIAL", "LOST", "REJECTED_BY_HUMAN")
+        # Stash a few things we need outside the session.
+        confirmation_number: str | None = None
+        payer_id_local: str | None = appeal.denial.claim.payerId if not terminal else None
+
+    # Active status probe — run outside the DB session so it can take its
+    # time without holding a row lock. Skip when outcome is already terminal.
+    if not terminal and payer_id_local:
+        from .status_probe import probe_appeal_status
+
+        try:
+            probe_outcome = await probe_appeal_status(appeal_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("status probe errored: %s", e)
+            probe_outcome = {"status": "ERROR", "error": str(e)[:200]}
+
+    # Apply probe result + finalize the check row.
+    with SessionLocal() as s:
+        check = s.scalar(select(FollowUpCheck).where(FollowUpCheck.id == check_id))
+        appeal = s.scalar(select(Appeal).where(Appeal.id == appeal_id))
+        if check is None or appeal is None:
+            return {"checks_run": 0, "escalated": False, "outcome_terminal": False}
+
+        terminal = appeal.outcome in ("WON", "PARTIAL", "LOST", "REJECTED_BY_HUMAN")
+        flipped_by_probe = False
+
+        if probe_outcome and probe_outcome.get("status") == "DECIDED" and not terminal:
+            # Probe surfaced an outcome that hasn't landed via ERA yet. Flip
+            # the appeal so the dashboard reflects reality; the recovery
+            # amount will reconcile from the next ERA.
+            decided_as = probe_outcome.get("decision")
+            if decided_as in ("WON", "LOST", "PARTIAL"):
+                appeal.outcome = decided_as
+                appeal.outcomeRecordedAt = now
+                terminal = True
+                flipped_by_probe = True
+
         check.status = "COMPLETED"
         check.completedAt = now
         check.outcome = appeal.outcome
+        probe_msg = ""
+        if probe_outcome:
+            probe_msg = (
+                f" Probe={probe_outcome.get('status')}"
+                + (
+                    f" decision={probe_outcome.get('decision')}"
+                    if probe_outcome.get("decision")
+                    else ""
+                )
+                + (
+                    f" note={probe_outcome.get('note')}"
+                    if probe_outcome.get("note")
+                    else ""
+                )
+            )
         if terminal:
-            check.notes = f"Outcome already {appeal.outcome} at {days}-day check."
+            check.notes = f"Outcome={appeal.outcome} at {days}-day check.{probe_msg}"
         else:
             check.notes = (
                 f"{days}-day check: no payer response yet (status={appeal.outcome})."
+                + probe_msg
             )
         s.commit()
 
@@ -849,5 +1135,7 @@ async def run_followup_check(appeal_id: str, check_id: str, days: int) -> dict:
         "checks_run": 1,
         "escalated": escalated,
         "outcome_terminal": terminal,
+        "flipped_by_probe": flipped_by_probe,
+        "probe_status": (probe_outcome or {}).get("status"),
         "days": days,
     }

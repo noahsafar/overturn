@@ -1,0 +1,3 @@
+account_number,patient_name,dob,insurance_id,payer_name,service_date,procedure_code,billed,denial_code,denial_reason,denied_amount
+ACC-700001,"FRANKLIN, GEORGINA",1965-04-09,KP556677889,Kaiser Permanente,2024-09-01,99213,145.00,CO-24,Capitation,145.00
+ACC-700002,"OBASI, EMEKA",1948-12-30,KP667788990,Kaiser Permanente,2024-09-02,99204,295.00,CO-24,Capitation,295.00

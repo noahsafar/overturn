@@ -56,8 +56,25 @@ class ClinicalContextExtractionReq(BaseModel):
     filename: str
 
 
+class EobParseReq(BaseModel):
+    pdf: str  # base64 encoded PDF
+    filename: str
+
+
+class ScreenshotParseReq(BaseModel):
+    image: str  # base64 encoded image
+    filename: str
+
+
 class BackfillEmbeddingsReq(BaseModel):
     payerId: str | None = None
+
+
+class CorrectedClaimReq(BaseModel):
+    denialId: str
+    correctedCpt: str | None = None
+    correctedModifier: str | None = None
+    reason: str
 
 
 @app.get("/healthz")
@@ -108,6 +125,29 @@ async def status(req: StatusReq) -> dict:
         raise HTTPException(404, str(e)) from e
 
 
+@app.post("/internal/corrected-claim/submit")
+async def corrected_claim_submit(req: CorrectedClaimReq) -> dict:
+    """Generate + submit a corrected 837 for a denial caused by a billing
+    error. Runs synchronously since there's no LLM in the loop."""
+    try:
+        from .activities import submit_corrected_claim_837
+
+        result = await submit_corrected_claim_837(
+            req.denialId,
+            {
+                "corrected_cpt": req.correctedCpt,
+                "corrected_modifier": req.correctedModifier,
+                "reason": req.reason,
+            },
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    except Exception as e:
+        logger.error(f"corrected-claim submit failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
 @app.post("/internal/ai-edit")
 async def ai_edit(req: AiEditReq) -> dict:
     """AI-powered appeal letter editing. Runs synchronously for immediate response."""
@@ -133,11 +173,25 @@ async def parse_era(req: EraParseReq) -> dict:
             "claims": [
                 {
                     "control_number": c.control_number,
+                    "payer_name": c.payer_name,
+                    "patient_name": c.patient_name,
+                    "member_id": c.member_id,
+                    "service_date_start": c.service_date_start,
+                    "service_date_end": c.service_date_end,
                     "billed": c.billed,
                     "paid": c.paid,
                     "denied": c.denied,
+                    "cpt_codes": c.cpt_codes,
+                    "payment_date": c.payment_date,
+                    "rendering_provider": c.rendering_provider,
                     "denials": [
-                        {"code": d.code, "reason": d.reason, "amount": d.amount}
+                        {
+                            "code": d.code,
+                            "reason": d.reason,
+                            "amount": d.amount,
+                            "cpt": d.cpt,
+                            "raw_snippet": d.raw_snippet,
+                        }
                         for d in c.denials
                     ],
                 }
@@ -211,4 +265,76 @@ async def extract_clinical_context(req: ClinicalContextExtractionReq) -> dict:
         }
     except Exception as e:
         logger.exception(f"clinical context extraction failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
+@app.post("/internal/parse-eob")
+async def parse_eob(req: EobParseReq) -> dict:
+    """Parse a denial PDF and extract structured denial information.
+
+    Routes internally: ERA-shaped PDFs use the deterministic 835 parser;
+    everything else uses OCR + LLM. The response is the same shape either way,
+    plus a `source_type` hint and (for ERA-routed PDFs) `extracted_text` so the
+    caller can run outcome ingestion against the same text.
+    """
+    try:
+        from .eob_parser import parse_eob
+
+        result = parse_eob(req)
+        return {
+            "denials": [
+                {
+                    "control_number": d.control_number,
+                    "patient_name": d.patient_name,
+                    "member_id": d.member_id,
+                    "service_date": d.service_date,
+                    "denial_code": d.denial_code,
+                    "denial_reason": d.denial_reason,
+                    "denied_amount": d.denied_amount,
+                    "payer_name": d.payer_name,
+                    "billed_amount": d.billed_amount,
+                    "cpt": d.cpt,
+                    "raw_snippet": d.raw_snippet,
+                    "payment_date": d.payment_date,
+                    "rendering_provider": d.rendering_provider,
+                }
+                for d in result.denials
+            ],
+            "source": result.source,
+            "confidence": result.confidence,
+            "source_type": result.source_type,
+            "extracted_text": result.extracted_text,
+        }
+    except Exception as e:
+        logger.exception(f"EOB parsing failed: {e}")
+        raise HTTPException(500, str(e)) from e
+
+
+@app.post("/internal/parse-screenshot")
+async def parse_screenshot(req: ScreenshotParseReq) -> dict:
+    """Parse screenshot/image and extract denial information.
+
+    Supports images of payer portals, EOB documents, denial letters, etc.
+    Uses Claude vision to understand and extract denial data.
+    """
+    try:
+        from .screenshot_parser import parse_screenshot
+
+        result = parse_screenshot(req)
+        return {
+            "denials": [
+                {
+                    "denial_code": d.denial_code,
+                    "denial_reason": d.denial_reason,
+                    "denied_amount": d.denied_amount,
+                    "patient_info": d.patient_info,
+                    "confidence": d.confidence,
+                }
+                for d in result.denials
+            ],
+            "source": result.source,
+            "confidence": result.confidence,
+        }
+    except Exception as e:
+        logger.exception(f"screenshot parsing failed: {e}")
         raise HTTPException(500, str(e)) from e

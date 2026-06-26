@@ -134,8 +134,17 @@ export const POST = apiHandler(
         },
       });
 
+      const { scoreDenial } = await import("@/lib/denial-priority");
       for (const denial of claimData.denials) {
         const receivedAt = new Date();
+        const filingDeadline = payer.appealWindowDays != null
+          ? computeFilingDeadline(receivedAt, payer.appealWindowDays)
+          : null;
+        const scored = scoreDenial({
+          denialCode: denial.code,
+          deniedAmount: Number(denial.amount) || 0,
+          filingDeadline,
+        });
         await prisma.denial.create({
           data: {
             claimId: claim.id,
@@ -144,7 +153,11 @@ export const POST = apiHandler(
             deniedAmount: denial.amount.toString(),
             eraRawText: `CLP*${claimData.control_number}*${claimData.billed}*${claimData.paid}~CAS*${denial.code}*${denial.amount}~`,
             receivedAt,
-            filingDeadline: computeFilingDeadline(receivedAt, payer.appealWindowDays),
+            filingDeadline,
+            predictedWinProb: scored.predictedWinProb,
+            priorityScore: scored.priorityScore,
+            priorityTier: scored.priorityTier,
+            scoreExplain: scored.scoreExplain as unknown as object,
           },
         });
         created++;

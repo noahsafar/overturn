@@ -1,0 +1,84 @@
+MERIDIAN OCCUPATIONAL HEALTH
+Initial Evaluation + Treatment Note
+
+Patient: Crawford, Samuel
+DOB: 1985-08-12          MRN: MOH-2024-7715
+Date of Service: 07/15/2024
+Rendering Provider: Helena Marsh, MD (PM&R, NPI 1331100886)
+Encounter Type: New patient evaluation (CPT 99203) + procedures
+
+CHIEF COMPLAINT
+Right shoulder pain, 5 days, after recreational activity. NOT
+work-related — see history below.
+
+HPI
+39-year-old right-hand-dominant male, employed as a software engineer
+(sedentary desk-based role, no overhead reaching responsibilities),
+presents with acute-on-subacute right shoulder pain that began on
+the evening of 07/10/2024. Mechanism of injury: while playing
+recreational pickup basketball at a community gym during personal
+time on a Saturday evening, patient reached overhead aggressively
+to block a shot, felt an immediate sharp pain in the lateral
+deltoid/anterior shoulder, and had difficulty raising the arm above
+shoulder height afterward. Pain is now 5/10 at rest and 8/10 with
+overhead motion. Reports decreased range of motion and night pain
+when sleeping on the right side.
+
+OCCUPATIONAL HISTORY (per claim qualification for CO-19 appeal)
+Patient confirms — and is willing to sign a separate written
+attestation — that:
+1. The injury occurred OUTSIDE of work hours, off employer premises,
+   during personal recreational activity (community basketball
+   league, not employer-sponsored).
+2. Patient's occupation is fully sedentary (software engineering
+   from a desk-based workstation). There is no occupational task
+   that required overhead reaching, lifting, or repetitive
+   shoulder loading at or near the time of injury.
+3. No prior occupational claims filed; no prior shoulder injuries
+   on file.
+4. Employer has been notified informally; no workers' compensation
+   First Report of Injury has been filed because the injury is
+   not work-related.
+
+This claim should be billed to the patient's commercial health plan,
+NOT to a workers' compensation carrier. Documentation supports
+non-occupational etiology.
+
+EXAM
+Right shoulder:
+- Inspection: no visible deformity or bruising. No muscle atrophy.
+- Range of motion: active forward flexion 110° (vs 175° left),
+  abduction 95° (vs 170°), external rotation 40° (vs 80°).
+- Strength: 4/5 supraspinatus (empty can), 4-/5 external rotation,
+  5/5 elbow flexion/extension.
+- Special tests: positive Neer impingement sign, positive
+  Hawkins-Kennedy, positive empty-can. Lift-off test difficult to
+  perform due to pain.
+- Distal neurovascular intact.
+
+ASSESSMENT
+1. Acute rotator cuff strain, right shoulder, non-occupational
+   (S46.011A) — recreational injury.
+2. Shoulder impingement syndrome, right (M75.41) — likely secondary
+   process.
+
+PLAN — TODAY'S ENCOUNTER & PROCEDURES
+1. CPT 99203 — initial evaluation completed as above.
+2. CPT 97140 — Manual therapy techniques (myofascial release of
+   trapezius, posterior capsular stretch, scapular mobilization).
+   Performed in-clinic by PT extender under MD supervision; 15 min
+   one-on-one.
+3. CPT 97110 — Therapeutic exercise (scapular stabilization,
+   pendulum, isometric external rotation). 30 min one-on-one.
+4. Ice and NSAID counseling.
+5. Sling provided for comfort, weaning over 5-7 days.
+6. RTC 1 week for re-evaluation; consider MRI if persistent
+   weakness or no improvement.
+
+ATTESTATION
+Patient verbally confirmed at the start of the visit, and this
+provider has documented, that the injury did not occur during the
+course of employment and that this care should not be billed to
+workers' compensation.
+
+Electronically signed: Marsh, Helena MD on 07/15/2024 15:09

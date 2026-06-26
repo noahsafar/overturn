@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "mcp__claude_ai_tavily__tavily_search",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(cloc apps *)",
+      "Bash(cloc *)",
+      "Bash(python3 *)",
+      "Bash(npm install *)",
+      "Bash(pnpm add *)",
+      "Bash(node -e \"const pdfParse = require\\('pdf-parse'\\); console.log\\('pdf-parse loaded successfully'\\);\")",
+      "Bash(pnpm remove *)",
+      "Bash(pip3 install *)"
+    ]
+  }
+}

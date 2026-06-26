@@ -26,6 +26,12 @@ model Practice {
   clearinghouseSftpHost  String?
   clearinghouseSftpUser  String?
   clearinghouseSftpPathEnc Bytes?
+  // Whether the polling loop should pick this practice up. When false, the
+  // SFTP creds stay configured but no ingest runs.
+  clearinghouseEnabled   Boolean          @default(false)
+  clearinghouseLastPolledAt   DateTime?
+  clearinghouseLastSuccessAt  DateTime?
+  clearinghouseLastError      String?     @db.Text
   createdAt              DateTime         @default(now())
   patients               Patient[]
   claims                 Claim[]
@@ -107,10 +113,11 @@ model Payer {
   faxNumber        String?
   appealAddress    String?
   epaSupported     Boolean           @default(false)
-  // Days from remittance date allowed for first-level appeal. Default 180
-  // matches BCBS / most plans; some payers (Medicare, certain BCBS regional
-  // plans) are stricter at 120 or 90.
-  appealWindowDays Int               @default(180)
+  // Days from remittance date allowed for first-level appeal. NULL means we
+  // do not yet have a verified policy for this payer — denials linked to
+  // such payers get filingDeadline=NULL (UI shows "Unknown") instead of an
+  // invented date. Populate this column manually as policies are researched.
+  appealWindowDays Int?
   patients         Patient[]
   claims           Claim[]
   policies         PayerPolicy[]
@@ -166,6 +173,11 @@ model Claim {
   // Optional: control number as known by the clearinghouse / payer. Used to
   // match incoming ERAs and follow-up payments to the originating claim.
   controlNumber   String?
+  // Servicing / rendering provider name as it appeared on the 835's N1*PE
+  // (payee) or NM1*82 (rendering provider) segment. NULL when the source
+  // didn't carry one. Used in appeal letters as the entity that performed
+  // the service, distinct from Practice.name which is the billing entity.
+  renderingProvider String?
   status          ClaimStatus @default(SUBMITTED)
   submittedAt     DateTime
   denials         Denial[]
@@ -192,6 +204,10 @@ model Denial {
   denialReason String   @db.Text
   deniedAmount Decimal  @db.Decimal(10, 2)
   eraRawText   String   @db.Text
+  // CPT/HCPCS code from the SVC segment that produced this denial. Null for
+  // claim-level adjustments (e.g., sequestration) and for sources that don't
+  // carry per-service codes (PDFs, screenshots).
+  serviceCpt   String?
   receivedAt   DateTime
   // Clinical context for this denial — pasted by the reviewer from the EHR
   // or filled by an EHR connector. The LLM cites verbatim from this, so it's
@@ -200,11 +216,25 @@ model Denial {
   // Computed at ingest from receivedAt + payer-configured appeal window
   // (default 180 days). Used to warn reviewers + block stale submissions.
   filingDeadline    DateTime?
+  // Predicted probability (0..1) that an appeal would succeed. Computed from
+  // CARC code base rate × payer history × claim amount band. Used to rank
+  // denials so reviewers work the highest-EV items first.
+  predictedWinProb  Float?
+  // priorityScore = deniedAmount * predictedWinProb * deadlineUrgency.
+  // Higher = work this first. NULL until scored.
+  priorityScore     Float?
+  // P1 / P2 / P3. P1 = top decile by priorityScore OR <14d to deadline with
+  // non-trivial $. P3 = low EV / write-off candidates.
+  priorityTier      String?
+  // CARC base rate cached at scoring time so we can explain the score on the
+  // denial detail page.
+  scoreExplain      Json?
   appeals      Appeal[]
   createdAt    DateTime @default(now())
 
   @@index([denialCode])
   @@index([filingDeadline])
+  @@index([priorityScore])
 }
 
 model Appeal {
@@ -221,6 +251,9 @@ model Appeal {
   recoveredAmount    Decimal?     @db.Decimal(10, 2)
   ourFee             Decimal?     @db.Decimal(10, 2)
   outcomeRecordedAt  DateTime?
+  // Denormalized from AgentRun.confidenceScore so list views can sort/filter
+  // without joining. Refresh whenever a new draft completes.
+  confidenceScore    Float?
   agentRunId         String?
   agentRun           AgentRun?    @relation(fields: [agentRunId], references: [id])
   humanReviewId      String?

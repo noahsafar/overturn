@@ -4,7 +4,7 @@ import { prisma } from "@overturn/db";
 import { requireUser } from "@/lib/auth";
 import { fmtMoney, fmtDateTime } from "@/lib/format";
 import { deadlineState } from "@/lib/deadlines";
-import { ReviewControls } from "./ReviewControls";
+import { ReviewProvider, ReviewEditor, ReviewActions } from "./ReviewControls";
 import { AppealProgressClient } from "./AppealProgressClient";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
@@ -24,6 +24,7 @@ export default async function AppealPage({
       agentRun: true,
       humanReview: true,
       submissions: { orderBy: { startedAt: "desc" } },
+      followUpChecks: { orderBy: { scheduledFor: "asc" } },
     },
   });
   if (!appeal) notFound();
@@ -37,7 +38,17 @@ export default async function AppealPage({
     include: { user: { select: { email: true } } },
   });
 
-  const citations = (appeal.citations as Array<{ policyId: string; quote: string; sourceUrl?: string }>) ?? [];
+  type Citation = {
+    source?: "policy" | "chart";
+    policyId?: string;
+    quote: string;
+    sourceUrl?: string;
+    page?: string;
+    note?: string;
+  };
+  const allCitations = (appeal.citations as Citation[]) ?? [];
+  const policyCitations = allCitations.filter((c) => (c.source ?? "policy") === "policy");
+  const chartCitations = allCitations.filter((c) => c.source === "chart");
 
   const isDrafting = !["READY", "FAILED", "SKIPPED"].includes(appeal.status);
 
@@ -55,55 +66,141 @@ export default async function AppealPage({
       )}
 
       {!isDrafting && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <ReviewProvider
+          appealId={appeal.id}
+          initialLetter={appeal.draftLetter ?? ""}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
             <Card title="Payer">{appeal.denial.claim.payer.name}</Card>
             <Card title="Template">{appeal.templateUsed || "—"}</Card>
             <Card title="Denied amount">{fmtMoney(appeal.denial.deniedAmount as unknown as number)}</Card>
+            <ConfidenceCard
+              score={appeal.confidenceScore ?? appeal.agentRun?.confidenceScore ?? null}
+              rationale={
+                (appeal.agentRun?.auditTrail as { confidence_rationale?: string } | null)
+                  ?.confidence_rationale ?? null
+              }
+            />
           </div>
 
-          <section>
-            <h2 className="font-semibold text-brand-900 mb-2">Draft letter</h2>
-            {appeal.draftLetter ? (
-              <pre className="bg-white border border-gray-200 rounded p-4 whitespace-pre-wrap text-sm leading-relaxed">{appeal.draftLetter}</pre>
-            ) : (
-              <p className="text-sm text-gray-500">No draft letter available.</p>
-            )}
-          </section>
+          {(() => {
+            const editable =
+              !!appeal.draftLetter &&
+              appeal.outcome === "PENDING" &&
+              !appeal.submittedAt &&
+              !dl?.pastDue;
+            return (
+              <section>
+                <h2 className="font-semibold text-brand-900 mb-2">Draft letter</h2>
+                {appeal.draftLetter ? (
+                  editable ? (
+                    // Editable textarea + the inline "Edit with AI" toggle.
+                    // Approve/Reject buttons live at the bottom of the page.
+                    <ReviewEditor />
+                  ) : (
+                    <pre className="bg-white border border-gray-200 rounded p-4 whitespace-pre-wrap text-sm leading-relaxed">
+                      {appeal.draftLetter}
+                    </pre>
+                  )
+                ) : (
+                  <p className="text-sm text-gray-500">No draft letter available.</p>
+                )}
+              </section>
+            );
+          })()}
 
           <section>
-            <h2 className="font-semibold text-brand-900 mb-2">Citations ({citations.length})</h2>
-            {citations.length === 0 ? (
+            <h2 className="font-semibold text-brand-900 mb-2">
+              Citations ({allCitations.length})
+            </h2>
+            {allCitations.length === 0 ? (
               <p className="text-sm text-gray-500">No citations.</p>
             ) : (
-              <ul className="space-y-2">
-                {citations.map((c, i) => (
-                  <li key={i} className="bg-white border border-gray-200 rounded p-3 text-sm">
-                    <div className="font-mono text-xs text-gray-500">{c.policyId}</div>
-                    <div className="italic mt-1">"{c.quote}"</div>
-                    {c.sourceUrl && (
-                      <a href={c.sourceUrl} target="_blank" rel="noopener" className="text-brand-700 text-xs hover:underline">
-                        {c.sourceUrl} →
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-4">
+                {policyCitations.length > 0 && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                      Payer policy ({policyCitations.length})
+                    </div>
+                    <ul className="space-y-2">
+                      {policyCitations.map((c, i) => (
+                        <li
+                          key={`p${i}`}
+                          className="bg-white border border-gray-200 rounded p-3 text-sm"
+                        >
+                          <div className="font-mono text-xs text-gray-500">
+                            {c.policyId}
+                          </div>
+                          <div className="italic mt-1">"{c.quote}"</div>
+                          {c.sourceUrl && (
+                            <a
+                              href={c.sourceUrl}
+                              target="_blank"
+                              rel="noopener"
+                              className="text-brand-700 text-xs hover:underline"
+                            >
+                              {c.sourceUrl} →
+                            </a>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {chartCitations.length > 0 && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                      Clinical chart ({chartCitations.length})
+                    </div>
+                    <ul className="space-y-2">
+                      {chartCitations.map((c, i) => (
+                        <li
+                          key={`c${i}`}
+                          className="bg-white border border-gray-200 rounded p-3 text-sm"
+                        >
+                          {c.note && (
+                            <div className="text-xs text-gray-500">{c.note}</div>
+                          )}
+                          <div className="italic mt-1">"{c.quote}"</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 
-          {appeal.agentRun && (
-            <section>
-              <h2 className="font-semibold text-brand-900 mb-2">Agent run</h2>
-              <div className="bg-white border border-gray-200 rounded p-3 text-sm space-y-1">
-                <Row k="Status" v={appeal.agentRun.status} />
-                <Row k="Confidence" v={appeal.agentRun.confidenceScore?.toFixed(2) ?? "—"} />
-                <Row k="Cost" v={`${((appeal.agentRun.costCents ?? 0) / 100).toFixed(2)} USD`} />
-                <Row k="Started" v={fmtDateTime(appeal.agentRun.startedAt)} />
-                {appeal.agentRun.completedAt && <Row k="Completed" v={fmtDateTime(appeal.agentRun.completedAt)} />}
-              </div>
-            </section>
-          )}
+          {appeal.agentRun && (() => {
+            const audit = (appeal.agentRun.auditTrail ?? {}) as {
+              strategist_conf?: number;
+              drafter_conf?: number;
+              combined_conf?: number;
+              confidence_rationale?: string;
+              citation_valid_count?: number;
+            };
+            return (
+              <section>
+                <h2 className="font-semibold text-brand-900 mb-2">Agent run</h2>
+                <div className="bg-white border border-gray-200 rounded p-3 text-sm space-y-1">
+                  <Row k="Status" v={appeal.agentRun.status} />
+                  <Row k="Combined confidence" v={appeal.agentRun.confidenceScore?.toFixed(2) ?? "—"} />
+                  {audit.strategist_conf != null && (
+                    <Row k="Case merit (strategist)" v={audit.strategist_conf.toFixed(2)} />
+                  )}
+                  {audit.drafter_conf != null && (
+                    <Row k="Draft quality (drafter)" v={audit.drafter_conf.toFixed(2)} />
+                  )}
+                  {audit.citation_valid_count != null && (
+                    <Row k="Citations verified" v={String(audit.citation_valid_count)} />
+                  )}
+                  <Row k="Cost" v={`${((appeal.agentRun.costCents ?? 0) / 100).toFixed(2)} USD`} />
+                  <Row k="Started" v={fmtDateTime(appeal.agentRun.startedAt)} />
+                  {appeal.agentRun.completedAt && <Row k="Completed" v={fmtDateTime(appeal.agentRun.completedAt)} />}
+                </div>
+              </section>
+            );
+          })()}
 
           {appeal.agentRun && appeal.agentRun.confidenceScore !== null && appeal.agentRun.confidenceScore < 0.5 && (
             <section className="bg-yellow-50 border border-yellow-200 rounded p-4 text-sm">
@@ -144,10 +241,6 @@ export default async function AppealPage({
                 </span>
               )}
             </section>
-          )}
-
-          {appeal.outcome === "PENDING" && !appeal.submittedAt && appeal.draftLetter && !dl?.pastDue && (
-            <ReviewControls appealId={appeal.id} initialLetter={appeal.draftLetter} />
           )}
 
           {appeal.submittedAt && (
@@ -209,6 +302,57 @@ export default async function AppealPage({
             </section>
           )}
 
+          {appeal.followUpChecks.length > 0 && (
+            <section>
+              <h2 className="font-semibold text-brand-900 mb-2">Follow-up checks</h2>
+              <p className="text-xs text-gray-500 mb-2">
+                Scheduled probes after submission. Each tick either confirms an
+                outcome via ERA, queries the payer's status surface, or
+                escalates to ops.
+              </p>
+              <ul className="space-y-2">
+                {appeal.followUpChecks.map((c) => {
+                  const due = c.scheduledFor.getTime() <= Date.now();
+                  return (
+                    <li
+                      key={c.id}
+                      className="bg-white border border-gray-200 rounded p-3 text-sm space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">
+                            {fmtDateTime(c.scheduledFor)}
+                          </span>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs ${
+                              c.status === "COMPLETED"
+                                ? "bg-success-50 text-success-700"
+                                : c.status === "FAILED"
+                                  ? "bg-error-50 text-error-700"
+                                  : due
+                                    ? "bg-warning-50 text-warning-700"
+                                    : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {c.status === "PENDING" && due ? "OVERDUE" : c.status}
+                          </span>
+                        </div>
+                        {c.outcome && (
+                          <span className="text-xs text-gray-600 font-mono">
+                            {c.outcome}
+                          </span>
+                        )}
+                      </div>
+                      {c.notes && (
+                        <div className="text-xs text-gray-600">{c.notes}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           {auditEvents.length > 0 && (
             <section>
               <h2 className="font-semibold text-brand-900 mb-2">Activity</h2>
@@ -225,7 +369,16 @@ export default async function AppealPage({
               </ul>
             </section>
           )}
-        </>
+
+          {!!appeal.draftLetter &&
+            appeal.outcome === "PENDING" &&
+            !appeal.submittedAt &&
+            !dl?.pastDue && (
+              <div className="pt-2 border-t border-gray-200">
+                <ReviewActions />
+              </div>
+            )}
+        </ReviewProvider>
       )}
     </div>
   );
@@ -242,5 +395,47 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between"><span className="text-gray-500">{k}</span><span>{v}</span></div>
+  );
+}
+
+function ConfidenceCard({
+  score,
+  rationale,
+}: {
+  score: number | null;
+  rationale: string | null;
+}) {
+  if (score == null) {
+    return (
+      <div className="bg-white border border-gray-200 rounded p-3">
+        <div className="text-xs uppercase tracking-wide text-gray-500">Confidence</div>
+        <div className="font-medium mt-1 text-gray-400">—</div>
+      </div>
+    );
+  }
+  const pct = Math.round(score * 100);
+  const tone =
+    score >= 0.8
+      ? "bg-success-50 border-success-200 text-success-800"
+      : score >= 0.6
+        ? "bg-primary-50 border-primary-200 text-primary-800"
+        : score >= 0.45
+          ? "bg-warning-50 border-warning-200 text-warning-800"
+          : "bg-error-50 border-error-200 text-error-800";
+  const label =
+    score >= 0.8
+      ? "Strong — approve as-is"
+      : score >= 0.6
+        ? "Solid — quick review"
+        : score >= 0.45
+          ? "Needs a careful read"
+          : "Weak — consider rebuilding";
+  return (
+    <div className={`border rounded p-3 ${tone}`}>
+      <div className="text-xs uppercase tracking-wide opacity-70">Confidence</div>
+      <div className="font-semibold text-xl mt-0.5 tabular-nums">{pct}%</div>
+      <div className="text-xs mt-0.5">{label}</div>
+      {rationale && <div className="text-xs mt-1 opacity-80 italic">{rationale}</div>}
+    </div>
   );
 }

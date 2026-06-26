@@ -1,4 +1,5 @@
 // PUT /api/denials/:id/chart — set the chart excerpts text for a denial.
+// GET /api/denials/:id/chart — get the chart excerpts text for a denial.
 // Pasted by the reviewer from the EHR (Phase-1 manual path) or filled by
 // an EHR connector (Phase 2).
 import { z } from "zod";
@@ -9,6 +10,21 @@ const ParamsSchema = z.object({ id: z.string().min(1) });
 const BodySchema = z.object({
   chartExcerptsText: z.string().max(50_000),
 });
+
+export const GET = apiHandler(
+  {
+    paramsSchema: ParamsSchema,
+    requiredRole: "STAFF",
+  },
+  async ({ user, params }) => {
+    const d = await prisma.denial.findFirst({
+      where: { id: params.id, claim: { practiceId: user.practiceId } },
+      select: { chartExcerptsText: true },
+    });
+    if (!d) throw notFound();
+    return { chartExcerptsText: d.chartExcerptsText || "" };
+  },
+);
 
 export const PUT = apiHandler(
   {

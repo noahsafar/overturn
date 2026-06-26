@@ -1,0 +1,72 @@
+HARBOR ORTHOPEDIC GROUP
+New Patient Consultation Note
+
+Patient: Okonkwo, Adaeze
+DOB: 1979-02-14          MRN: HOG-2024-3318
+Date of Service: 01/31/2024
+Rendering Provider: Daniel Park, MD (Orthopedic Surgery, NPI 1356679920)
+Encounter Type: New patient consultation, level 4 (CPT 99204, mod 25)
+
+CHIEF COMPLAINT
+Right knee pain x 10 weeks, refractory to conservative care.
+
+HPI
+44-year-old previously active female (recreational soccer, 3x/week)
+presents with insidious onset right medial-sided knee pain that began
+after a misstep on uneven ground in mid-November 2023. Pain is 6/10
+at baseline, 8/10 with stair descent and prolonged sitting >30 min
+(theater sign positive). Reports occasional catching and one episode
+of give-way when stepping off a curb. No frank locking. Denies
+constitutional symptoms.
+
+PRIOR CONSERVATIVE TREATMENT (failed)
+- 11/20/2023 — 12/15/2023: NSAIDs (naproxen 500 mg BID x 4 weeks) and
+  activity modification — partial relief, returned to baseline when
+  resumed activity.
+- 12/18/2023 — 01/19/2024: Formal physical therapy x 8 sessions
+  (Harbor Rehab) focused on quadriceps strengthening and patellofemoral
+  mechanics. Discharge note (Cano, PT, DPT) documents persistent
+  medial-sided pain and effusion despite full home exercise compliance.
+
+EXAM (right knee)
+- Range of motion: 0–125° (left 0–135°)
+- Small effusion present; ballottement positive
+- McMurray maneuver: positive medial click with extension under valgus
+- Joint line tenderness: medial > lateral
+- Ligamentous exam: stable Lachman, varus/valgus, posterior drawer
+- Neurovascular: intact distal pulses, normal sensation
+
+IMAGING / DIAGNOSTICS ORDERED & PERFORMED TODAY
+- CPT 73564 — Knee X-ray, four views, weight-bearing — performed and
+  reviewed during visit. Demonstrates mild medial joint space narrowing
+  (~ 3 mm) without acute fracture; no loose bodies. Films stored in PACS.
+- CPT 20610 — Intra-articular corticosteroid injection (right knee),
+  ultrasound localization not used. 1 mL Kenalog-40 + 4 mL 1% lidocaine
+  injected via superolateral approach after standard skin prep.
+  Tolerated well, no immediate complications.
+
+ASSESSMENT
+1. Probable medial meniscal tear, right knee (S83.241A) with associated
+   effusion (M25.461).
+2. Failed conservative management with NSAIDs and 8 sessions of PT.
+
+PLAN
+1. Diagnostic injection performed today for both therapeutic intent and
+   diagnostic confirmation. Patient educated about expected 24-48 h
+   post-injection course.
+2. MRI right knee ordered — to be scheduled outpatient. Will obtain
+   prior authorization prior to scheduling.
+3. Return visit 4 weeks for re-evaluation. If MRI confirms meniscal
+   tear and symptoms persist, will discuss arthroscopic referral.
+4. Discussed risks/benefits/alternatives. Patient consented to today's
+   procedures.
+
+NOTE TO BILLING REGARDING PRIOR AUTH (CO-197)
+Same-day injection performed during the initial new-patient consultation.
+Per Cigna policy 0408 and standard of care, diagnostic-therapeutic
+intra-articular injection during the index orthopedic evaluation does
+NOT require advance prior authorization when performed at the point of
+care for joints with documented effusion and after failure of two prior
+conservative measures (both documented above). Requesting reconsideration.
+
+Electronically signed: Park, Daniel MD on 01/31/2024 16:44

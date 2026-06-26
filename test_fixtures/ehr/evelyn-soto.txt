@@ -1,0 +1,59 @@
+RIVERSIDE SURGICAL CENTER
+Operative Report — Ambulatory Surgery
+
+Patient: Soto, Evelyn
+DOB: 1972-11-09          MRN: RSC-2024-0820
+Date of Surgery: 05/20/2024
+Surgeon: Marcus Lavoie, MD (NPI 1665544331)
+Assistant: Tara Ruiz, PA-C
+Anesthesia: MAC + local infiltration (separate billing)
+
+PREOPERATIVE DIAGNOSIS
+Symptomatic incisional hernia, midline abdomen, status post prior open
+appendectomy (2009). ICD-10: K43.2.
+
+POSTOPERATIVE DIAGNOSIS
+Same.
+
+PROCEDURE PERFORMED
+CPT 49560 — Initial repair of incisional or ventral hernia,
+reducible (open approach).
+
+INDICATION FOR SURGERY
+51-year-old female with a 4 cm reducible incisional hernia at the
+inferior pole of her appendectomy scar, progressively enlarging over
+14 months. Patient reports pulling discomfort with prolonged standing
+and a recent episode of incarceration that reduced spontaneously
+(documented in ED visit 04/02/2024). Conservative management with
+abdominal binder ineffective. Risk of progression to strangulation
+discussed; patient elected for elective repair.
+
+PRIOR-PAYER COORDINATION
+Patient has primary coverage under Spouse's BCBS PPO; this submission
+to Anthem is the secondary claim. Anthem received the primary EOB
+(BCBS payment $2,500 against $4,650 allowed; patient deductible
+satisfied; primary patient responsibility $0). Anthem's
+adjudication line OA-23 reflects coordination of benefits; appeal
+requests review for any remaining Anthem-side allowable amount.
+
+OPERATIVE DETAILS (abbreviated)
+- General positioning, supine. Time-out completed.
+- Standard prep and drape. Midline scar excised. Hernia sac identified
+  and dissected free of subcutaneous fat. Sac contents (omentum)
+  reduced into abdomen.
+- Fascial defect measured 4 cm. Repaired primarily with interrupted
+  0-Prolene Mayo-style overlap. Reinforced with 6x6 cm onlay polypropylene
+  mesh secured with #2-0 Prolene interrupted sutures.
+- Hemostasis confirmed. Subcutaneous tissue approximated with 3-0
+  Vicryl. Skin closed with 4-0 Monocryl subcuticular.
+- Sponge, needle, and instrument counts correct.
+- Patient transported to PACU in stable condition.
+
+COMPLICATIONS
+None.
+
+DISPOSITION
+Discharge same day, post-PACU monitoring per protocol. Follow-up
+office visit 14 days. Pain management plan provided.
+
+Electronically signed: Lavoie, Marcus MD on 05/20/2024 11:47

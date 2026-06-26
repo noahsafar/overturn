@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { prisma } from "@overturn/db";
 import {
   SparklesIcon,
   DocumentMagnifyingGlassIcon,
@@ -6,11 +7,14 @@ import {
   PaperAirplaneIcon,
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
+import { fmtMoney } from "@/lib/format";
+
+export const dynamic = "force-dynamic";
 
 const steps = [
   {
-    title: "Ingest denials",
-    body: "Drop an ERA file or sync your clearinghouse. We parse every denial code.",
+    title: "Upload denied claims",
+    body: "Upload any denial document and we'll parse every claim automatically.",
     icon: DocumentMagnifyingGlassIcon,
   },
   {
@@ -30,13 +34,65 @@ const steps = [
   },
 ];
 
-export default function HomePage() {
+// Compute platform-wide proof metrics for the marketing band on the home
+// page. Numbers stay honest — won + partial only, not "pending" — so a
+// pending submission can't inflate the win-rate. Returns null fields when
+// there aren't enough decisions to be meaningful.
+async function loadProofMetrics() {
+  const [recoveredAgg, appeals, durations] = await Promise.all([
+    prisma.appeal.aggregate({
+      _sum: { recoveredAmount: true },
+      where: { outcome: { in: ["WON", "PARTIAL"] } },
+    }),
+    prisma.appeal.groupBy({
+      by: ["outcome"],
+      _count: { _all: true },
+    }),
+    prisma.appeal.findMany({
+      where: {
+        outcome: { in: ["WON", "PARTIAL"] },
+        submittedAt: { not: null },
+        outcomeRecordedAt: { not: null },
+      },
+      select: { submittedAt: true, outcomeRecordedAt: true },
+      take: 500,
+    }),
+  ]);
+
+  const recovered = Number(recoveredAgg._sum.recoveredAmount ?? 0);
+  const won = appeals.find((a) => a.outcome === "WON")?._count._all ?? 0;
+  const partial = appeals.find((a) => a.outcome === "PARTIAL")?._count._all ?? 0;
+  const lost = appeals.find((a) => a.outcome === "LOST")?._count._all ?? 0;
+  const pending = appeals.find((a) => a.outcome === "PENDING")?._count._all ?? 0;
+  const decided = won + partial + lost;
+  const winRate = decided >= 5 ? (won + partial * 0.5) / decided : null;
+
+  const daysToOutcome =
+    durations.length >= 5
+      ? Math.round(
+          durations.reduce((sum, d) => {
+            const diff =
+              (d.outcomeRecordedAt!.getTime() - d.submittedAt!.getTime()) /
+              86_400_000;
+            return sum + Math.max(diff, 0);
+          }, 0) / durations.length,
+        )
+      : null;
+
+  const totalAppeals = won + partial + lost + pending;
+
+  return { recovered, winRate, daysToOutcome, totalAppeals };
+}
+
+export default async function HomePage() {
+  const metrics = await loadProofMetrics().catch(() => null);
+
   return (
-    <div className="space-y-16">
+    <div className="space-y-10">
       <section className="space-y-6">
         <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-soft">
           <span className="h-1.5 w-1.5 rounded-full bg-ai-500" />
-          Phase 1 MVP · synthetic data
+          Early pilot · live with real practices
         </div>
         <h1 className="text-5xl font-semibold tracking-tight text-gray-900">
           Fire your billing company.
@@ -55,6 +111,41 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {metrics && metrics.totalAppeals > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Pilot results to date
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ProofStat
+              label="Recovered for practices"
+              value={fmtMoney(metrics.recovered)}
+              tone="success"
+            />
+            <ProofStat
+              label="Win rate"
+              value={metrics.winRate != null ? `${Math.round(metrics.winRate * 100)}%` : "—"}
+              tone="primary"
+              hint={metrics.winRate == null ? "needs ≥ 5 decided appeals" : undefined}
+            />
+            <ProofStat
+              label="Avg days to outcome"
+              value={metrics.daysToOutcome != null ? `${metrics.daysToOutcome}d` : "—"}
+              tone="gray"
+              hint={metrics.daysToOutcome == null ? "needs ≥ 5 paid appeals" : undefined}
+            />
+            <ProofStat
+              label="Appeals run"
+              value={metrics.totalAppeals.toLocaleString()}
+              tone="gray"
+            />
+          </div>
+          <p className="mt-3 text-xs text-gray-500">
+            Live from the platform. Numbers update with every new outcome.
+          </p>
+        </section>
+      )}
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900">How it works</h2>
@@ -80,6 +171,31 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function ProofStat({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: "success" | "primary" | "gray";
+  hint?: string;
+}) {
+  const tones: Record<typeof tone, string> = {
+    success: "text-success-700",
+    primary: "text-primary-700",
+    gray: "text-gray-900",
+  };
+  return (
+    <div className="card p-4">
+      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
+      <div className={`mt-1 text-3xl font-semibold tabular-nums ${tones[tone]}`}>{value}</div>
+      {hint && <div className="mt-0.5 text-xs text-gray-400">{hint}</div>}
     </div>
   );
 }

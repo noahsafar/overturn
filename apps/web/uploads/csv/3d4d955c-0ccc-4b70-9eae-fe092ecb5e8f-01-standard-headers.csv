@@ -1,0 +1,4 @@
+patient_id,first_name,last_name,dob,member_id,payer,service_date,cpt,icd,billed_amount,denial_code,denial_reason,denied_amount,received_at
+PT-1001,ANNETTE,FOSTER,1962-08-14,BC117200332,Blue Cross Blue Shield of Texas,2024-04-10,99213,Z00.00,145.00,CO-45,Charge exceeds fee schedule,46.32,2024-04-22
+PT-1002,KEVIN,WONG,1985-02-28,UH998877665,United Healthcare,2024-04-12,99214,J06.9,215.00,CO-50,Not medically necessary,215.00,2024-04-25
+PT-1003,DARNELL,KIRBY,1978-11-03,AET445566778,Aetna,2024-04-15,93000,R07.9,120.00,PR-1,Deductible,120.00,2024-04-26

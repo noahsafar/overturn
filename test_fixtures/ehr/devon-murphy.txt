@@ -1,0 +1,80 @@
+OAKWOOD MEDICAL GROUP
+New Patient Office Visit
+
+Patient: Murphy, Devon
+DOB: 1991-06-04          MRN: OMG-2024-3340
+Date of Service: 06/25/2024
+Rendering Provider: Renee Chiang, MD (Internal Medicine, NPI 1442211008)
+Encounter Type: New patient visit, straightforward MDM (CPT 99202)
+
+CHIEF COMPLAINT
+Establish primary care; long-overdue annual exam following recent
+relocation.
+
+HPI
+33-year-old male presents to establish care after moving to the area
+3 months ago. Last PCP visit estimated 6+ years ago. Generally feels
+well. Reports occasional tension-type headaches 1-2 times monthly
+relieved by ibuprofen. No chronic conditions known. Denies tobacco use.
+Alcohol: 4-6 beers per week, primarily on weekends. Exercise: walks
+dog 30 min/day, occasional weekend hiking. Sleep 6-7 h nightly.
+
+PMH
+None known.
+
+MEDICATIONS
+- Ibuprofen 400 mg PRN headache (over the counter)
+- Multivitamin daily
+
+ALLERGIES
+NKDA.
+
+FAMILY HISTORY
+Father — type 2 diabetes (age 60), HTN (age 55). Mother — alive,
+healthy. Maternal grandmother — breast cancer (age 67).
+
+SOCIAL HISTORY
+Single. Works remote as software engineer. No tobacco. Moderate
+alcohol use as above. No recreational drug use. Not currently
+sexually active.
+
+ROS
+Constitutional: Denies fever, weight change, fatigue.
+HEENT: Headaches as above; no vision/hearing changes.
+CV: No chest pain, palpitations, exertional dyspnea.
+Resp: No cough, dyspnea.
+GI: No abdominal pain, change in bowel habits, blood in stool.
+GU: No dysuria, hematuria.
+MSK: No joint pain.
+Neuro: No focal weakness, paresthesia, syncope.
+Psych: Denies anxiety, depression. PHQ-2 administered = 0.
+Skin/Endo/Heme: Negative.
+
+EXAM
+Vitals: BP 124/78   HR 70   RR 14   SpO2 99% RA   Wt 178 lb   Ht 70 in
+        BMI 25.5
+Gen: Well-appearing male in NAD.
+HEENT: PERRL, EOMI, oropharynx clear, no LAD.
+CV: RRR, no MRG.
+Resp: CTAB.
+Abd: Soft, NT/ND, no organomegaly.
+Skin: No suspicious lesions.
+
+ASSESSMENT/PLAN
+1. Adult preventive care (Z00.00) — establish baseline.
+   - Labs ordered (separate claim under capitated lab benefit):
+     CBC, CMP, lipid panel, HbA1c (given family history), TSH, vitamin D.
+   - Recommended diet/exercise discussion completed.
+2. Tension-type headache (G44.209) — episodic, OTC management adequate.
+   Education on red-flag symptoms.
+
+PREVENTIVE
+- Immunizations reviewed: due for Tdap booster (>10 y).
+- Counseling: alcohol moderation, sleep hygiene.
+
+E/M LEVEL: 99202 — new patient, straightforward MDM (one minor
+issue plus preventive baseline).
+
+RTC: Follow-up 2-3 weeks for lab review.
+
+Electronically signed: Chiang, Renee MD on 06/25/2024 10:14

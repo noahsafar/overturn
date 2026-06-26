@@ -1,0 +1,49 @@
+LAKESIDE IMAGING ASSOCIATES
+Ordering Provider Note + Imaging Order Justification
+
+Patient: Ramirez, Carlos
+DOB: 1968-09-21          MRN: LIA-0457829
+Date of Service: 11/15/2023
+Ordering Provider: Sandra Goldfarb, MD (Neurology, NPI 1769988775)
+Performing Facility: Lakeside Imaging Associates
+Examination Ordered: MRI brain with and without IV contrast (CPT 70553)
+ICD-10 Indications: G43.709 (Chronic migraine, unspecified), R51.9 (Headache),
+H53.13 (Sudden visual loss, bilateral)
+
+CLINICAL HISTORY / INDICATION FOR IMAGING
+55-year-old male referred from neurology with progressive change in
+headache character over 8 weeks. Reports new-onset position-dependent
+headaches waking him at 4-5 AM, worse with Valsalva, partial relief
+upright. Two episodes of transient binocular visual blurring lasting
+3-5 minutes accompanying severe headaches in the last 3 weeks. No
+photophobia, phonophobia, or aura that match his historical migraine
+pattern.
+
+PRIOR WORKUP
+- 10/02/2023: Comprehensive metabolic panel, CBC, ESR, CRP — all
+  unremarkable. CRP 1.2 mg/L.
+- 10/11/2023: Office neuro exam (Goldfarb) — papilledema noted bilaterally
+  on funduscopic exam (Frisén grade 2). Documented in note.
+- 10/18/2023: Outpatient CT head without contrast — no acute hemorrhage
+  or large mass effect, but small right frontal hypodensity, "cannot
+  exclude underlying lesion; recommend MRI with contrast."
+- 10/30/2023: Trial of sumatriptan/topiramate ineffective for current
+  symptom pattern.
+
+WHY MRI WITH AND WITHOUT CONTRAST IS MEDICALLY NECESSARY
+Per the ACR Appropriateness Criteria (Headache, Variant 6 — chronic
+headache with new features/papilledema), MRI brain with and without
+contrast is the most appropriate initial advanced imaging when CT
+findings are equivocal and papilledema is present. The combination of
+papilledema, position-dependent morning headaches, and indeterminate
+CT focus on the prior study raises clinical concern for an intracranial
+mass lesion or idiopathic intracranial hypertension; contrast is
+required to characterize enhancement patterns and exclude small
+neoplasm or meningeal disease. Imaging is being performed prior to
+escalating empiric pharmacologic management.
+
+ATTESTATION
+The ordering provider has reviewed and signed the order. Imaging is
+clinically indicated and not for screening purposes.
+
+Electronically signed: Goldfarb, Sandra MD on 11/14/2023 17:08
