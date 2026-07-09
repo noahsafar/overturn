@@ -1,18 +1,29 @@
 // Next.js middleware — runs on every request at the edge.
 //
-// We can't hit Prisma from the edge runtime, so this middleware does just one
-// thing: stash the request's pathname into a header that downstream server
-// components can read via `headers()`. The onboarding redirect logic lives in
-// the root layout (full Node runtime, DB access) — it reads `x-pathname` and
-// decides what to do.
+// Two responsibilities:
+//   1. Stash the pathname into a header (`x-pathname`) so server components
+//      can read it — the onboarding redirect in the root layout uses this.
+//      (We can't hit Prisma from the edge runtime, so the redirect decision
+//      itself lives in the root layout.)
+//   2. When Clerk is configured, install clerkMiddleware so `auth()` works
+//      in server code. In dev (no Clerk keys) we skip it entirely and the
+//      dev-auth stub in lib/auth.ts takes over.
 
 import { NextResponse, type NextRequest } from "next/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export function middleware(req: NextRequest) {
+const clerkEnabled =
+  process.env.DEV_AUTH !== "true" && !!process.env.CLERK_SECRET_KEY;
+
+function withPathname(req: NextRequest): NextResponse {
   const res = NextResponse.next();
   res.headers.set("x-pathname", req.nextUrl.pathname);
   return res;
 }
+
+export default clerkEnabled
+  ? clerkMiddleware((_auth, req) => withPathname(req))
+  : withPathname;
 
 export const config = {
   // Skip on static assets, API routes that should never redirect, and the
