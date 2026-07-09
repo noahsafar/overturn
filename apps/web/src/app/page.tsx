@@ -88,19 +88,30 @@ export default async function HomePage() {
   const metrics = await loadProofMetrics().catch(() => null);
 
   return (
-    <div className="space-y-10">
-      <section className="space-y-6">
+    <div className="relative space-y-12">
+      {/* Soft brand glow behind the hero — pure decoration. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-gradient-to-br from-accent-100/70 via-primary-50/60 to-transparent blur-3xl"
+      />
+
+      <section className="relative space-y-6 pt-4">
         <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-soft">
-          <span className="h-1.5 w-1.5 rounded-full bg-ai-500" />
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-400 opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-500" />
+          </span>
           Early pilot · live with real practices
         </div>
-        <h1 className="text-5xl font-semibold tracking-tight text-gray-900">
-          Fire your billing company.
+        <h1 className="font-display text-6xl font-medium tracking-tight text-gray-900">
+          Fire your billing company<span className="text-accent-500">.</span>
         </h1>
-        <p className="max-w-2xl text-lg text-gray-600">
+        <p className="max-w-2xl text-lg leading-relaxed text-gray-600">
           Our agents draft payer-specific appeal letters with verified citations,
-          run them past a human reviewer, and submit them via the payer's portal.
-          You pay nothing unless we recover money.
+          run them past a human reviewer, and submit them via the payer's portal.{" "}
+          <span className="font-medium text-gray-900">
+            You pay nothing unless we recover money.
+          </span>
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <Link href="/dashboard" className="btn-primary">
@@ -154,14 +165,19 @@ export default async function HomePage() {
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {steps.map((s, i) => (
-            <div key={s.title} className="card p-5">
+            <div
+              key={s.title}
+              className="card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-elevated"
+            >
               <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600 ring-1 ring-inset ring-primary-100">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-900 text-accent-300 shadow-soft">
                   <s.icon className="h-5 w-5" />
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-mono text-gray-400">0{i + 1}</span>
+                    <span className="font-mono text-xs font-medium text-accent-600">
+                      0{i + 1}
+                    </span>
                     <h3 className="text-base font-semibold text-gray-900">{s.title}</h3>
                   </div>
                   <p className="text-sm text-gray-600">{s.body}</p>
@@ -186,8 +202,18 @@ function ProofStat({
   tone: "success" | "primary" | "gray";
   hint?: string;
 }) {
-  const tones: Record<typeof tone, string> = {
-    success: "text-success-700",
+  // The recovered-dollars stat is the whole pitch — it gets the dark navy
+  // treatment with the brand emerald, echoing the dashboard's hero stat.
+  if (tone === "success") {
+    return (
+      <div className="rounded-xl border border-gray-850 bg-gradient-to-br from-gray-900 to-gray-850 p-4 shadow-card">
+        <div className="text-xs uppercase tracking-wide text-gray-400">{label}</div>
+        <div className="mt-1 text-3xl font-semibold tabular-nums text-accent-400">{value}</div>
+        {hint && <div className="mt-0.5 text-xs text-gray-500">{hint}</div>}
+      </div>
+    );
+  }
+  const tones: Record<"primary" | "gray", string> = {
     primary: "text-primary-700",
     gray: "text-gray-900",
   };
