@@ -2,39 +2,18 @@ import Link from "next/link";
 import { prisma } from "@overturn/db";
 import { requireUser } from "@/lib/auth";
 import { decryptPatient } from "@/lib/patient";
-import { fmtMoney, fmtDate, fmtName } from "@/lib/format";
+import { fmtMoney, fmtName } from "@/lib/format";
 import { groupDenials } from "@/lib/denial-grouping";
 import { scoreDenial } from "@/lib/denial-priority";
-import { ArrowUpTrayIcon, ArrowRightIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
+import { DenialsExplorer, type DenialRow, type DenialOutcome } from "./DenialsExplorer";
+import { BulkStartButton } from "./BulkStartButton";
 
 export const dynamic = "force-dynamic";
-
-type AppealOutcome = "WON" | "PARTIAL" | "PENDING" | "LOST";
-
-const outcomeStyles: Record<AppealOutcome, string> = {
-  WON: "bg-success-50 text-success-700 ring-success-500/20",
-  PARTIAL: "bg-warning-50 text-warning-700 ring-warning-500/20",
-  PENDING: "bg-primary-50 text-primary-700 ring-primary-500/20",
-  LOST: "bg-error-50 text-error-700 ring-error-500/20",
-};
-
-const tierStyles: Record<"P1" | "P2" | "P3", string> = {
-  P1: "bg-error-50 text-error-700 ring-error-500/30",
-  P2: "bg-warning-50 text-warning-700 ring-warning-500/30",
-  P3: "bg-gray-50 text-gray-600 ring-gray-300/40",
-};
 
 function daysUntil(d: Date | null | undefined): number | null {
   if (!d) return null;
   return Math.floor((d.getTime() - Date.now()) / 86_400_000);
-}
-
-function deadlineLabel(days: number | null): { text: string; tone: string } {
-  if (days == null) return { text: "—", tone: "text-gray-400" };
-  if (days < 0) return { text: "Expired", tone: "text-error-600 font-medium" };
-  if (days <= 7) return { text: `${days}d left`, tone: "text-error-600 font-medium" };
-  if (days <= 30) return { text: `${days}d left`, tone: "text-warning-700" };
-  return { text: `${days}d left`, tone: "text-gray-500" };
 }
 
 export default async function DenialsPage() {
@@ -90,6 +69,28 @@ export default async function DenialsPage() {
     .filter((g) => !g.lead.appeals?.[0])
     .reduce((sum, g) => sum + g.totalDenied * (g.predictedWinProb ?? 0), 0);
 
+  // Decrypt PHI and flatten to primitives on the server, then hand the client
+  // explorer plain data so search/filter runs without shipping the crypto.
+  const rows: DenialRow[] = groups.map((g) => {
+    const pt = decryptPatient(g.lead.claim.patient);
+    const appeal = g.lead.appeals?.[0];
+    return {
+      id: g.lead.id,
+      patientName: fmtName(`${pt.firstName} ${pt.lastName}`).trim(),
+      payer: g.lead.claim.payer.name,
+      code: g.lead.denialCode,
+      cpts: g.affectedCpts,
+      count: g.count,
+      totalDenied: g.totalDenied,
+      winPct: g.predictedWinProb != null ? Math.round(g.predictedWinProb * 100) : null,
+      deadlineDays: daysUntil(g.lead.filingDeadline),
+      outcome: (appeal?.outcome as DenialOutcome | undefined) ?? null,
+      confidencePct:
+        appeal?.confidenceScore != null ? Math.round(appeal.confidenceScore * 100) : null,
+      tier: g.priorityTier,
+    };
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
@@ -99,10 +100,19 @@ export default async function DenialsPage() {
             Sorted by expected recovery × urgency. Work P1 first.
           </p>
         </div>
-        <Link href="/upload" className="btn-secondary">
-          <ArrowUpTrayIcon className="h-4 w-4" />
-          Upload Denied Claims
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <BulkStartButton
+            unworkedCount={
+              rows.filter(
+                (r) => r.outcome === null && (r.deadlineDays == null || r.deadlineDays >= 0),
+              ).length
+            }
+          />
+          <Link href="/upload" className="btn-secondary">
+            <ArrowUpTrayIcon className="h-4 w-4" />
+            Upload Denied Claims
+          </Link>
+        </div>
       </div>
 
       {groups.length > 0 && (
@@ -128,110 +138,15 @@ export default async function DenialsPage() {
       )}
 
       {groups.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-gray-500">No denials yet</p>
+        <div className="card flex flex-col items-center gap-3 py-16 text-center">
+          <p className="text-sm text-gray-500">No denials yet.</p>
+          <Link href="/upload" className="btn-primary">
+            <ArrowUpTrayIcon className="h-4 w-4" />
+            Upload your first denials
+          </Link>
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">Priority</th>
-                <th className="px-4 py-3 font-medium">Patient</th>
-                <th className="px-4 py-3 font-medium">Payer</th>
-                <th className="px-4 py-3 font-medium">Code</th>
-                <th className="px-4 py-3 font-medium">Services</th>
-                <th className="px-4 py-3 text-right font-medium">Denied</th>
-                <th className="px-4 py-3 text-right font-medium">Win prob</th>
-                <th className="px-4 py-3 font-medium">Deadline</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="w-12" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {groups.map((g) => {
-                const pt = decryptPatient(g.lead.claim.patient);
-                const appeal = g.lead.appeals?.[0];
-                const outcome = appeal?.outcome as AppealOutcome | undefined;
-                const tier = g.priorityTier;
-                const winPct =
-                  g.predictedWinProb != null ? Math.round(g.predictedWinProb * 100) : null;
-                const days = daysUntil(g.lead.filingDeadline);
-                const dl = deadlineLabel(days);
-                return (
-                  <tr key={g.lead.id} className="group hover:bg-gray-50/70">
-                    <td className="px-4 py-3">
-                      {tier ? (
-                        <span className={`badge ${tierStyles[tier]}`}>{tier}</span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {fmtName(`${pt.firstName} ${pt.lastName}`).trim() || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{g.lead.claim.payer.name}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-gray-600">{g.lead.denialCode}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {g.affectedCpts.length > 0 ? (
-                        <span className="font-mono text-xs text-gray-700">
-                          {g.affectedCpts.join(", ")}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                      {g.count > 1 && (
-                        <span className="ml-2 text-xs text-gray-500">
-                          ({g.count} services)
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900">
-                      {fmtMoney(g.totalDenied)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-700">
-                      {winPct != null ? `${winPct}%` : "—"}
-                    </td>
-                    <td className={`px-4 py-3 text-xs tabular-nums ${dl.tone}`}>
-                      <span className="inline-flex items-center gap-1">
-                        <ClockIcon className="h-3.5 w-3.5" />
-                        {dl.text}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {appeal && outcome ? (
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className={`badge ${outcomeStyles[outcome]}`}>
-                            {outcome.charAt(0) + outcome.slice(1).toLowerCase()}
-                          </span>
-                          {appeal.confidenceScore != null && (
-                            <span className="text-xs text-gray-500 tabular-nums">
-                              {Math.round(appeal.confidenceScore * 100)}% conf
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="badge bg-gray-100 text-gray-700 ring-gray-300/40">
-                          Unworked
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/denials/${g.lead.id}`}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-gray-700 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        View <ArrowRightIcon className="h-3.5 w-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DenialsExplorer rows={rows} />
       )}
     </div>
   );
