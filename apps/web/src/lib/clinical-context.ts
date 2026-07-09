@@ -282,11 +282,11 @@ function getCPTDescriptions(codes: string[]): string[] {
 }
 
 function getCPTDescription(code: string): string {
-  return getCPTDescriptions([code])[0];
+  return getCPTDescriptions([code])[0] ?? `${code} procedure`;
 }
 
 function getICDDescription(code: string): string {
-  return getICDDescriptions([code])[0];
+  return getICDDescriptions([code])[0] ?? `${code} diagnosis`;
 }
 
 /**

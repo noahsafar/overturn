@@ -39,7 +39,7 @@ beforeAll(async () => {
   }
 });
 
-describe.skipIf(!serverAvailable, "Performance Testing - API Endpoints (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Performance Testing - API Endpoints (requires running server)", () => {
   describe("Health Check Performance", () => {
     it("should respond to health check in under 100ms", async () => {
       const start = Date.now();
@@ -111,7 +111,7 @@ describe.skipIf(!serverAvailable, "Performance Testing - API Endpoints (requires
   });
 });
 
-describe.skipIf(!serverAvailable, "Load Testing - Concurrent Users (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Load Testing - Concurrent Users (requires running server)", () => {
   describe("Dashboard Performance Under Load", () => {
     it("should handle 10 concurrent dashboard loads", async () => {
       const requests = Array.from({ length: 10 }, () =>
@@ -168,7 +168,7 @@ describe.skipIf(!serverAvailable, "Load Testing - Concurrent Users (requires run
   });
 });
 
-describe.skipIf(!serverAvailable, "Stress Testing - Resource Limits (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Stress Testing - Resource Limits (requires running server)", () => {
   describe("Large File Upload", () => {
     it("should handle 5MB file upload", async () => {
       // Generate 5MB test file
@@ -229,7 +229,7 @@ describe.skipIf(!serverAvailable, "Stress Testing - Resource Limits (requires ru
   });
 });
 
-describe.skipIf(!serverAvailable, "Performance Regression Tests (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Performance Regression Tests (requires running server)", () => {
   describe("Critical Path Performance", () => {
     it("should maintain acceptable performance over 100 iterations", async () => {
       const iterations = 100;
@@ -320,7 +320,7 @@ async function simulateAppealWorkflow() {
   await setTimeout(100, 3000); // Verify citations
 }
 
-describe.skipIf(!serverAvailable, "Edge Case Performance (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Edge Case Performance (requires running server)", () => {
   it("should handle empty database responses efficiently", async () => {
     const start = Date.now();
     const response = await fetch("http://localhost:3000/api/appeals?limit=0");
@@ -353,7 +353,7 @@ describe.skipIf(!serverAvailable, "Edge Case Performance (requires running serve
   });
 });
 
-describe.skipIf(!serverAvailable, "Realistic Volume Testing (requires running server)", () => {
+describe.skipIf(!serverAvailable)("Realistic Volume Testing (requires running server)", () => {
   it("should simulate realistic practice workload", async () => {
     // Simulate a practice with 10 concurrent users:
     // - 3 users viewing denials
@@ -394,7 +394,7 @@ describe.skipIf(!serverAvailable, "Realistic Volume Testing (requires running se
     const requestsPerMinute = denialsPerHour / 60; // ~2 per minute
 
     // Simulate 1 hour of activity
-    const requests: Promise<void>[] = [];
+    const requests: Promise<Response>[] = [];
     for (let i = 0; i < requestsPerMinute; i++) {
       requests.push(fetch("http://localhost:3000/api/denials"));
       await setTimeout(100, 100); // 1 minute spread
@@ -404,7 +404,7 @@ describe.skipIf(!serverAvailable, "Realistic Volume Testing (requires running se
     const responses = await Promise.allSettled(requests);
     const duration = Date.now() - start;
 
-    const successful = responses.filter(( r) => r.status === "fulfilled" && (r.value as Response).ok).length;
+    const successful = responses.filter((r) => r.status === "fulfilled" && r.value.ok).length;
     expect(successful).toBeGreaterThan(requests.length * 0.95);
   });
 });

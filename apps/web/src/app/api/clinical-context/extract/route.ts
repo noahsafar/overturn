@@ -123,7 +123,7 @@ export const POST = apiHandler(
         {
           method: "POST",
           headers: {
-            "x-api-key": process.env.ZAI_API_KEY || process.env.ANTHROPIC_API_KEY,
+            "x-api-key": process.env.ZAI_API_KEY || process.env.ANTHROPIC_API_KEY || "",
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
           },

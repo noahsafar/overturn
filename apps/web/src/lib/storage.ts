@@ -56,10 +56,9 @@ async function uploadToS3(
       region: process.env.AWS_REGION || "us-east-1",
     });
 
-    const buffer =
-      file instanceof Buffer
-        ? file
-        : Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.isBuffer(file)
+      ? file
+      : Buffer.from(await file.arrayBuffer());
 
     await client.send(
       new PutObjectCommand({
@@ -91,10 +90,9 @@ async function uploadToLocal(
     const fs = await import("fs/promises");
     const path = await import("path");
 
-    const buffer =
-      file instanceof Buffer
-        ? file
-        : Buffer.from(await file.arrayBuffer());
+    const buffer = Buffer.isBuffer(file)
+      ? file
+      : Buffer.from(await file.arrayBuffer());
 
     const fullPath = path.join(LOCAL_STORAGE_DIR, key);
 

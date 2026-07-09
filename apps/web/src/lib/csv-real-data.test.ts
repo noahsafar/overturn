@@ -83,36 +83,36 @@ describe("CSV Import/Export - Real Data Testing", () => {
       const result = parseClaimsCSV(EDGE_CASES.SPECIAL_CHARS);
 
       expect(result.claims).toHaveLength(1);
-      expect(result.claims[0].patient_first_name).toBe("O'BRIEN");
+      expect(result.claims[0]!.patient_first_name).toBe("O'BRIEN");
     });
 
     it("should handle very long field values", () => {
       const result = parseClaimsCSV(EDGE_CASES.LONG_FIELDS);
 
       expect(result.claims).toHaveLength(1);
-      expect(result.claims[0].denial_reason).toContain("very_long_denial_reason");
+      expect(result.claims[0]!.denial_reason).toContain("very_long_denial_reason");
     });
 
     it("should handle multiple CPT/ICD codes", () => {
       const result = parseClaimsCSV(EDGE_CASES.MULTIPLE_CODES);
 
       expect(result.claims).toHaveLength(1);
-      expect(result.claims[0].cpt_codes).toEqual(["99213", "99214", "99304"]);
-      expect(result.claims[0].icd_codes).toEqual(["F33.1", "F32.1", "M54.5"]);
+      expect(result.claims[0]!.cpt_codes).toEqual(["99213", "99214", "99304"]);
+      expect(result.claims[0]!.icd_codes).toEqual(["F33.1", "F32.1", "M54.5"]);
     });
 
     it("should handle empty optional fields", () => {
       const result = parseClaimsCSV(EDGE_CASES.EMPTY_FIELDS);
 
       expect(result.claims).toHaveLength(1);
-      expect(result.claims[0].patient_member_id).toBe("");
+      expect(result.claims[0]!.patient_member_id).toBe("");
     });
 
     it("should handle unicode characters", () => {
       const result = parseClaimsCSV(EDGE_CASES.UNICODE);
 
       expect(result.claims).toHaveLength(1);
-      expect(result.claims[0].patient_first_name).toBe("JOSÉ");
+      expect(result.claims[0]!.patient_first_name).toBe("JOSÉ");
     });
 
     it("should detect duplicate claim IDs", () => {
