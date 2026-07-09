@@ -44,3 +44,12 @@ def notify_appeal_ready(appeal_id: str) -> None:
 
 def notify_appeal_outcome(appeal_id: str) -> None:
     _post("/api/internal/notify", {"event": "appeal.outcome", "appealId": appeal_id})
+
+
+def trigger_deadline_scan() -> None:
+    """Ask the web app to alert practices about expiring un-appealed denials.
+
+    The endpoint is idempotent (7-day dedupe per denial), so calling this
+    more often than daily is harmless.
+    """
+    _post("/api/internal/cron/deadline-scan", {})

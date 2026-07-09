@@ -13,6 +13,7 @@ from .api import app as fastapi_app
 from .clearinghouse import start_poll_loop as start_ingest_loop
 from .config import SETTINGS
 from .fake_portal import app as fake_portal_app
+from .schedules import start_deadline_scan_loop
 from .worker import main as run_temporal_worker
 
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,7 @@ async def main() -> None:
         asyncio.create_task(_serve(fastapi_app, 8001, "worker-api")),
         asyncio.create_task(_serve(fake_portal_app, 4555, "fake-portal")),
         asyncio.create_task(start_ingest_loop()),
+        asyncio.create_task(start_deadline_scan_loop()),
     ]
     # Temporal worker is optional in pure-API dev (e.g. running unit tests
     # that don't need a Temporal cluster).
