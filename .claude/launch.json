@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-local",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && set -a && source ../../.env && set +a && export DATABASE_URL=postgresql://overturn:overturn@localhost:5432/overturn && export NEXT_TELEMETRY_DISABLED=1 && exec pnpm dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
