@@ -32,6 +32,14 @@ model Practice {
   clearinghouseLastPolledAt   DateTime?
   clearinghouseLastSuccessAt  DateTime?
   clearinghouseLastError      String?     @db.Text
+  // ── Autopilot ─────────────────────────────────────────────────────────
+  // When enabled, appeal drafts whose verified confidence clears the
+  // threshold (and whose denied amount is under the cap, if set) are
+  // submitted without waiting for a human click. Everything else still
+  // routes to review. Off by default — practices opt in deliberately.
+  autoPilotEnabled          Boolean       @default(false)
+  autoPilotMinConfidence    Float         @default(0.85)
+  autoPilotMaxAmountCents   Int?
   createdAt              DateTime         @default(now())
   patients               Patient[]
   claims                 Claim[]
@@ -258,6 +266,10 @@ model Appeal {
   agentRun           AgentRun?    @relation(fields: [agentRunId], references: [id])
   humanReviewId      String?
   humanReview        HumanReview? @relation(fields: [humanReviewId], references: [id])
+  // Set when Autopilot submitted this appeal without a human click. Null =
+  // human-reviewed path. Kept separate from humanReview so the audit trail
+  // never claims a person approved something they didn't.
+  autoSubmittedAt    DateTime?
   submissions        Submission[]
   invoiceLineItem    InvoiceLineItem?
   followUpChecks     FollowUpCheck[]
@@ -415,8 +427,14 @@ model Notification {
   providerRef  String?
   errorMessage String?
   sentAt       DateTime?
+  // When a practice user has seen this in the in-app inbox. Null = unread.
+  readAt       DateTime?
+  // Optional pointer to the entity this notification is about (e.g. a denial
+  // id for deadline warnings). Used to dedupe repeat alerts.
+  resourceId   String?
   createdAt    DateTime  @default(now())
 
   @@index([practiceId, createdAt])
   @@index([status])
+  @@index([template, resourceId, createdAt])
 }

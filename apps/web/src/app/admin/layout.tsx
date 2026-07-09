@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="-mx-8 -my-10 flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden">
       <AdminSidebar email={user.email} />
       <div className="flex-1 overflow-y-auto bg-gray-50">
         <header className="border-b border-gray-200 bg-gray-900 px-8 py-3 text-sm text-gray-300 sticky top-0 z-10">

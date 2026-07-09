@@ -12,6 +12,8 @@ export type NotificationTemplate =
   | "appeal.ready_for_review"
   | "appeal.recovered"
   | "appeal.lost"
+  | "appeal.auto_submitted"
+  | "denial.deadline_warning"
   | "invoice.issued"
   | "invoice.paid";
 
@@ -22,6 +24,8 @@ export interface NotifyInput {
   subject: string;
   body: string;
   htmlBody?: string;
+  /** Entity this notification is about (e.g. denial/appeal id) — used for dedupe. */
+  resourceId?: string;
 }
 
 export async function notify(input: NotifyInput): Promise<{ id: string }> {
@@ -34,6 +38,7 @@ export async function notify(input: NotifyInput): Promise<{ id: string }> {
       subject: input.subject,
       body: input.body,
       status: "QUEUED",
+      resourceId: input.resourceId ?? null,
     },
   });
 
