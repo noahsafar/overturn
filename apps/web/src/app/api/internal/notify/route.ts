@@ -8,6 +8,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { notifyAppealReady, notifyOutcome } from "@/lib/notifications";
+import { runAutopilot } from "@/lib/autopilot";
 
 const Body = z.union([
   z.object({ event: z.literal("appeal.ready"), appealId: z.string().min(1) }),
@@ -32,7 +33,17 @@ export async function POST(req: NextRequest) {
 
   try {
     if (parsed.data.event === "appeal.ready") {
-      await notifyAppealReady(parsed.data.appealId);
+      // Autopilot gets first crack at a fresh draft. Only when it declines
+      // (policy off, below threshold, over cap) or fails (worker down) does
+      // the appeal go to the human review queue.
+      const decision = await runAutopilot(parsed.data.appealId);
+      if (decision.action !== "submitted") {
+        if (decision.action === "failed") {
+          console.error(`[autopilot] ${parsed.data.appealId}: ${decision.reason}`);
+        }
+        await notifyAppealReady(parsed.data.appealId);
+      }
+      return NextResponse.json({ ok: true, autopilot: decision.action });
     } else if (parsed.data.event === "appeal.outcome") {
       await notifyOutcome(parsed.data.appealId);
     }
