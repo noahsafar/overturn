@@ -6,14 +6,19 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // Inter first (self-hosted via next/font, exposed as a CSS var) so it
+        // actually wins; previously -apple-system was listed first and Inter
+        // never rendered on macOS.
         sans: [
+          "var(--font-inter)",
+          "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
-          "Inter",
-          "SF Pro Display",
           "system-ui",
           "sans-serif",
         ],
+        // Editorial serif for marketing surfaces (landing hero) only.
+        display: ["var(--font-display)", "Georgia", "Times New Roman", "serif"],
         mono: ["SF Mono", "JetBrains Mono", "Monaco", "Menlo", "Consolas", "monospace"],
       },
       fontSize: {
@@ -41,25 +46,40 @@ export default {
           900: "#0c4a6e",
           950: "#082f49",
         },
+        // Neutral ramp tinted toward the brand ink (#0B1F3A from the logo)
+        // so headings, buttons, and borders all sit in the same navy family
+        // instead of generic cool gray.
         gray: {
-          50: "#f9fafb",
-          100: "#f3f4f6",
-          200: "#e5e7eb",
-          300: "#d1d5db",
-          400: "#9ca3af",
-          500: "#6b7280",
-          600: "#4b5563",
-          700: "#374151",
-          800: "#1f2937",
-          850: "#1a1f2e",
-          900: "#111827",
-          950: "#030712",
+          50: "#f8fafc",
+          100: "#f1f5f9",
+          200: "#e3e8f0",
+          300: "#cbd5e1",
+          400: "#94a3b8",
+          500: "#64748b",
+          600: "#475569",
+          700: "#334155",
+          800: "#1e2c44",
+          850: "#16253d",
+          900: "#0b1f3a",
+          950: "#061224",
         },
-        success: { 50: "#ecfdf5", 100: "#d1fae5", 500: "#059669", 600: "#047857", 700: "#065f46" },
-        warning: { 50: "#fffbeb", 100: "#fef3c7", 500: "#d97706", 600: "#b45309", 700: "#92400e" },
-        error: { 50: "#fef2f2", 100: "#fee2e2", 500: "#dc2626", 600: "#b91c1c", 700: "#991b1b" },
+        success: { 50: "#ecfdf5", 100: "#d1fae5", 200: "#a7f3d0", 500: "#059669", 600: "#047857", 700: "#065f46" },
+        warning: { 50: "#fffbeb", 100: "#fef3c7", 200: "#fde68a", 500: "#d97706", 600: "#b45309", 700: "#92400e" },
+        error: { 50: "#fef2f2", 100: "#fee2e2", 200: "#fecaca", 500: "#dc2626", 600: "#b91c1c", 700: "#991b1b" },
         ai: { 50: "#f0fdf4", 100: "#dcfce7", 200: "#bbf7d0", 500: "#22c55e", 600: "#16a34a" },
-        brand: { 50: "#f0f9ff", 600: "#0284c7", 700: "#0369a1", 900: "#0c4a6e" },
+        brand: { 50: "#f0f9ff", 600: "#0284c7", 700: "#0369a1", 900: "#0b1f3a" },
+        // The emerald half of the logo mark — reserved for recovery/money
+        // moments so it keeps its punch.
+        accent: {
+          50: "#ecfdf5",
+          100: "#d1fae5",
+          200: "#a7f3d0",
+          300: "#6ee7b7",
+          400: "#34d399",
+          500: "#10b981",
+          600: "#059669",
+          700: "#047857",
+        },
       },
       borderRadius: {
         sm: "2px",
@@ -70,8 +90,11 @@ export default {
         "2xl": "16px",
       },
       boxShadow: {
-        soft: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
-        elevated: "0 4px 16px rgba(0, 0, 0, 0.08)",
+        // Navy-tinted so elevation reads as depth, not dirt.
+        soft: "0 1px 2px 0 rgb(11 31 58 / 0.05), 0 1px 3px -1px rgb(11 31 58 / 0.05)",
+        card: "0 1px 2px rgb(11 31 58 / 0.04), 0 2px 8px -2px rgb(11 31 58 / 0.06)",
+        elevated:
+          "0 2px 4px rgb(11 31 58 / 0.05), 0 12px 32px -8px rgb(11 31 58 / 0.14)",
       },
     },
   },

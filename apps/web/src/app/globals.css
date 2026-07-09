@@ -1,21 +1,20 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
-  --bg: 249 250 251;
+  --bg: 248 250 252;
   --surface: 255 255 255;
-  --border: 229 231 235;
-  --foreground: 17 24 39;
-  --muted: 107 114 128;
+  --border: 227 232 240;
+  --foreground: 11 31 58;
+  --muted: 100 116 139;
 }
 
 html,
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Inter is self-hosted via next/font in layout.tsx and applied through the
+     Tailwind font-sans stack (var(--font-inter) first). */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv11", "ss01", "ss02";
@@ -23,25 +22,40 @@ body {
   color: rgb(var(--foreground));
 }
 
+/* Brand-tinted text selection. */
+::selection {
+  background: rgb(16 185 129 / 0.22);
+  color: rgb(var(--foreground));
+}
+
+/* One consistent, accessible focus treatment everywhere. */
+:focus-visible {
+  outline: 2px solid rgb(16 185 129 / 0.7);
+  outline-offset: 2px;
+}
+
 @layer components {
   .card {
-    @apply rounded-xl border border-gray-200 bg-white shadow-soft;
+    @apply rounded-xl border border-gray-200/80 bg-white shadow-card;
   }
   .btn {
     @apply inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all;
   }
   .btn-primary {
-    @apply btn bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-950 shadow-soft;
+    @apply btn bg-gray-900 text-white shadow-soft hover:bg-gray-800 active:bg-gray-950;
   }
   .btn-secondary {
-    @apply btn border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-300;
+    @apply btn border border-gray-200 bg-white text-gray-800 hover:border-gray-300 hover:bg-gray-50;
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500;
   }
 }
 
 /* subtle scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgb(229 231 235); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgb(209 213 219); }
+::-webkit-scrollbar-thumb { background: rgb(203 213 225); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
